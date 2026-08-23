@@ -18,6 +18,8 @@ dependencies = [
     "lab>=8.10",
     "accelerate>=1.1.0",
     "torchvision>=0.28.0",
+    "fastapi>=0.141.1",
+    "uvicorn>=0.52.4",
 ]
 
 [[tool.uv.index]]
