@@ -2,7 +2,16 @@
 existing data/processed/hf_dataset_documents DatasetDict, WITHOUT touching
 any existing tablet's split assignment (see prepare_cdli_bulk.py's docstring
 for why the split field it assigned is used as-is here rather than re-
-running prepare_hf_dataset.py's random 90/5/5 split over everything).
+running prepare_hf_dataset.py's random 90/5/5 split over everything) --
+*except* when a backfill tablet_id turns out to already be present in the
+base corpus under a different split (session 2026-08-23 finding: 27 such
+collisions, mostly ORACC's own edition of a tablet plus our own showcase/
+backfill pull of the same physical tablet under a different sign-string,
+so the sign-level dedup elsewhere never catches it). For those, the base
+copy is dropped and the backfill's own split wins -- required for
+showcase_documents.jsonl specifically, whose whole point is a tablet held
+out of training; leaving the base copy in train while the showcase copy
+sits in test would defeat that guarantee silently.
 
 Run after prepare_cdli_bulk.py. Saves back to the same dir and (optionally)
 pushes the updated 'documents' config to the Hub.
@@ -26,6 +35,7 @@ IN_PATHS = [
     os.path.join(BASE_DIR, "data", "interim", "balance_documents.jsonl"),
     os.path.join(BASE_DIR, "data", "interim", "text_balance_documents.jsonl"),
     os.path.join(BASE_DIR, "data", "interim", "showcase_documents.jsonl"),
+    os.path.join(BASE_DIR, "data", "interim", "new_provenience_images_documents.jsonl"),
 ]
 DOCS_DIR = os.path.join(BASE_DIR, "data", "processed", "hf_dataset_documents")
 
@@ -53,11 +63,38 @@ def main():
             })
 
     ds = load_from_disk(DOCS_DIR)
+
+    # Drop any base-corpus row whose tablet_id a backfill file is about to
+    # (re-)introduce, so the backfill's own split always wins and no
+    # tablet_id ends up split across two sides at once.
+    n_dropped = 0
+    for split in ("train", "validation", "test"):
+        before = len(ds[split])
+        ds[split] = ds[split].filter(lambda ex: ex["tablet_id"] not in seen_tablet_ids)
+        n_dropped += before - len(ds[split])
+    if n_dropped:
+        print(f"Dropped {n_dropped} base-corpus rows whose tablet_id is also in a backfill source "
+              f"(backfill's own split assignment wins).")
+
     for split, new_rows in rows.items():
         if not new_rows:
             continue
         addition = Dataset.from_list(new_rows, features=ds[split].features)
         ds[split] = concatenate_datasets([ds[split], addition])
+
+    # A document with empty transliteration (found this session: 1,189
+    # rows, overwhelmingly ORACC lexical/sign-list projects that have real
+    # 'signs' but never had a running transliteration line to begin with)
+    # contributes nothing to MLM restoration and gives the metadata heads
+    # a classification target with no textual evidence behind it --
+    # strictly noise, not a smaller-but-real example.
+    n_empty = 0
+    for split in ("train", "validation", "test"):
+        before = len(ds[split])
+        ds[split] = ds[split].filter(lambda ex: ex["text"] and ex["text"].strip())
+        n_empty += before - len(ds[split])
+    if n_empty:
+        print(f"Dropped {n_empty} rows with empty transliteration text.")
 
     ds.save_to_disk(DOCS_DIR + "_with_cdli_bulk")
     print("Saved to", DOCS_DIR + "_with_cdli_bulk")

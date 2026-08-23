@@ -49,16 +49,27 @@ from src.data_pipeline.prepare_hf_dataset import (
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 COMBINED_PATH = os.path.join(BASE_DIR, "data", "processed", "combined_unique.jsonl")
 TEXT_DATASET_DIR = os.path.join(BASE_DIR, "data", "processed", "hf_dataset")
+TEST_JSONL_PATH = os.path.join(BASE_DIR, "data", "processed", "test.jsonl")
 OUT_DIR = os.path.join(BASE_DIR, "data", "processed", "hf_dataset_documents")
 
 
 def tablet_split_map():
+    # prepare_hf_dataset.py's own hf_dataset DatasetDict only ever holds
+    # train/validation -- its test split is written separately to
+    # test.jsonl (untokenized, with pre-mapped label fields "for easy eval
+    # later"), never saved into the DatasetDict itself. Read that file too,
+    # or every test-split tablet here silently gets dropped as "unmatched".
     text_ds = load_from_disk(TEXT_DATASET_DIR)
     mapping = {}
-    for split in ("train", "validation", "test"):
+    for split in ("train", "validation"):
         for tid in set(text_ds[split]["tablet_id"]):
             if tid:
                 mapping[tid] = split
+    with open(TEST_JSONL_PATH, encoding="utf-8") as f:
+        for line in f:
+            tid = json.loads(line).get("tablet_id")
+            if tid:
+                mapping[tid] = "test"
     return mapping
 
 

@@ -14,7 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 # mBERT's own WordPiece tokenizer. Neither side is pre-tokenized here.
 
 _DETERMINATIVE_RE = re.compile(r"\{[^}]*\}")  # e.g. {m}, {d}, {ki} -- editorial determinatives, dropped entirely (Lazar et al. 2021 do the same with sub/superscripts)
-_BRACKET_CHARS = "[]⸢⸣()<>|"  # editorial uncertainty/restoration brackets and ATF sign-separator (|) -- stripped, content kept
+_SCRIBAL_ERROR_RE = re.compile(r"<<[^>]*>>")  # ATF: sign(s) an editor considers an erroneous scribal addition -- unlike <x> (accidentally omitted, restored by the editor, real content), <<x>> should be dropped entirely, content included, not just the doubled brackets
+_BRACKET_CHARS = "[]⸢⸣()<>|"  # editorial uncertainty/restoration brackets and ATF sign-separator (|) -- stripped, content kept (single <x> only -- <<x>> is handled separately above, before this runs)
 _SUBSCRIPT_DIGITS = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
 _ASCII_INDEX_DIGIT_RE = re.compile(r"([a-zŋ])([0-9]+)(?![0-9a-z])")
 
@@ -44,12 +45,18 @@ def clean_transliteration(raw):
         return ""
     text = _normalize_cuneiml_romanization(raw)
     text = _DETERMINATIVE_RE.sub("", text)
+    text = _SCRIBAL_ERROR_RE.sub("", text)
     text = text.translate(str.maketrans("", "", _BRACKET_CHARS))
     # Em-dash used as a name/word-joining mark (e.g. 'GAL—MU', 'qur-di—DINGIR-ma') --
     # not in mBERT's vocab (unlike every other Assyriological diacritic we
     # checked), so normalize it to the plain hyphen already used for the
     # same joining role elsewhere in the transliteration.
     text = text.replace("—", "-")
+    # A dropped {determinative} or <<scribal error>> sitting directly
+    # between two hyphens (e.g. "pa-<<da>>-aš" -> "pa--aš") leaves a
+    # doubled hyphen once its content is gone -- collapse it so the
+    # tokenizer doesn't see a fake empty syllable.
+    text = re.sub(r"-{2,}", "-", text)
     return re.sub(r"\s+", " ", text).strip()
 
 # --- LABEL ENGINEERING V3.0 MAPPINGS ---
@@ -68,6 +75,12 @@ def map_language(l):
     if 'akkadian' in l or 'assyrian' in l or 'babylonian' in l: return 'Akkadian'
     if 'sumerian' in l: return 'Sumerian'
     if any(x in l for x in ['urartian', 'hittite', 'eblaite', 'elamite', 'old persian', 'ugaritic']): return 'Peripheral/Other'
+    # Added after the same full-catalogue audit as PROVENIENCE_LABELS
+    # (session 2026-08-22) -- small counts individually (dozens-low
+    # hundreds), but all genuinely real, attested ancient Near Eastern
+    # languages that plainly belong in this bucket's own stated scope, not
+    # in 'undetermined'/'uncertain' (which stay Unknown, correctly).
+    if any(x in l for x in ['persian', 'aramaic', 'hebrew', 'hurrian']): return 'Peripheral/Other'
     return 'Unknown'
 
 def map_period(p):
@@ -113,12 +126,58 @@ def map_provenience(p):
     if 'ugarit' in p or 'ras shamra' in p: return 'Ugarit'
     if 'sippar' in p: return 'Sippar'
     if 'nimrud' in p or 'kalhu' in p: return 'Nimrud'
+    # Added after auditing the full 353k-row CDLI catalogue (session
+    # 2026-08-22): these are all major, well-attested single findspots
+    # that the original 12-class list was silently dropping to 'Unknown'
+    # wholesale -- Ḫattusa alone (14.5k catalogue rows) outnumbers several
+    # of the original 12 classes combined. Catalogue counts overstate how
+    # many end up in the actual corpus, though, since most CDLI records
+    # have no recoverable transliteration anywhere in our sources -- only
+    # candidates that cleared >=50 actual documents after text recovery
+    # are kept here (a few catalogue-large sites, e.g. Ašnakkum, Lagash,
+    # Qattara, ended up with single digits to zero and were dropped).
+    if 'hattus' in p or 'boğazk' in p or 'bogazk' in p: return 'Hattusa'
+    if p.startswith('mari ') or p.startswith('mari(') or p == 'mari' or 'tell hariri' in p: return 'Mari'
+    if 'ebla' in p or 'tell mardikh' in p: return 'Ebla'
+    if 'susa' in p or 'shush' in p: return 'Susa'
+    # 'babylonia'/'babylonian' (the broader, often-uncertain region) must
+    # NOT count as the specific city -- "uncertain (mod. Babylonia)" is
+    # explicitly marking the findspot as unknown, not asserting Babylon.
+    if ('babylon' in p and 'babylonia' not in p) or 'babili' in p: return 'Babylon'
+    if 'nuzi' in p or 'gasur' in p: return 'Nuzi'
+    if 'irisagrig' in p: return 'Irisagrig'
+    if 'persepolis' in p or 'pārśa' in p or 'parsa' in p: return 'Persepolis'
+    if 'kish' in p: return 'Kish'
+    if 'larsa' in p: return 'Larsa'
+    if 'garšana' in p or 'garsana' in p: return 'Garšana'
+    if 'emar' in p or 'tell meskene' in p: return 'Emar'
+    if 'isin' in p: return 'Isin'
+    if 'ešnunna' in p or 'esnunna' in p or 'tell asmar' in p: return 'Ešnunna'
+    if 'šaduppum' in p or 'saduppum' in p: return 'Šaduppum'
+    if 'nerebtum' in p: return 'Nerebtum'
+    if 'šuruppak' in p or 'suruppak' in p: return 'Šuruppak'
+    if 'kisurra' in p: return 'Kisurra'
+    if 'adab' in p or 'bismaya' in p: return 'Adab'
+    if 'huzirina' in p or 'sultantepe' in p: return 'Huzirina'
+    if 'pī-kasî' in p or 'pi-kasi' in p or 'tell abu antiq' in p: return 'Pī-Kasî'
+    if 'tuttul' in p or "tell bi'a" in p or 'tell bia' in p: return 'Tuttul'
+    if 'akhetaten' in p or 'amarna' in p: return 'Amarna'
+    if 'zabalam' in p: return 'Zabalam'
     return 'Unknown'
 
 LANGUAGE_LABELS = ['Akkadian', 'Sumerian', 'Bilingual', 'Peripheral/Other']
 PERIOD_LABELS = ['Neo-Assyrian', 'Ur III', 'Old Babylonian', 'Old Assyrian', 'Middle Assyrian', 'Middle Babylonian', 'Neo-Babylonian', 'Third Millennium', 'Late Antiquity']
 GENRE_LABELS = ['Administrative', 'Lexical', 'Royal Inscriptions', 'Literary & Scholarly', 'Legal', 'Letters']
-PROVENIENCE_LABELS = ['Nineveh', 'Umma', 'Girsu', 'Nippur', 'Puzriš-Dagan', 'Kanesh', 'Assur', 'Uruk', 'Ur', 'Ugarit', 'Sippar', 'Nimrud']
+# Candidate period classes tied to the provenience expansion below (Middle
+# Hittite, Proto-/Neo-/Middle Elamite) were tried and dropped: after actual
+# text recovery they landed at 3/2/0/0 documents respectively, useless for
+# a classification head -- catalogue-scale counts (the Middle Hittite value
+# alone had 14.7k rows) just don't survive the "does a transliteration
+# exist anywhere in our sources" filter for this particular period field.
+PROVENIENCE_LABELS = ['Nineveh', 'Umma', 'Girsu', 'Nippur', 'Puzriš-Dagan', 'Kanesh', 'Assur', 'Uruk', 'Ur', 'Ugarit', 'Sippar', 'Nimrud',
+                      'Hattusa', 'Mari', 'Ebla', 'Susa', 'Babylon', 'Nuzi', 'Irisagrig', 'Persepolis', 'Kish', 'Larsa', 'Garšana',
+                      'Emar', 'Isin', 'Ešnunna', 'Šaduppum', 'Nerebtum', 'Šuruppak', 'Kisurra',
+                      'Adab', 'Huzirina', 'Pī-Kasî', 'Tuttul', 'Amarna', 'Zabalam']
 
 def label_to_idx(label_str, label_list):
     if not label_str or label_str == 'Unknown':

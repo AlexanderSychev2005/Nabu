@@ -49,8 +49,15 @@ def already_have_ids():
                 have.add(json.loads(line)["tablet_id"])
     from datasets import load_from_disk
     docs = load_from_disk(os.path.join(BASE_DIR, "data", "processed", "hf_dataset"))
-    for split in ("train", "validation", "test"):
+    for split in ("train", "validation"):
         have.update(t for t in docs[split]["tablet_id"] if t)
+    # hf_dataset's own DatasetDict never holds a "test" split (prepare_
+    # hf_dataset.py writes it separately to test.jsonl) -- read that too.
+    with open(os.path.join(BASE_DIR, "data", "processed", "test.jsonl"), encoding="utf-8") as f:
+        for line in f:
+            tid = json.loads(line).get("tablet_id")
+            if tid:
+                have.add(tid)
     return have
 
 

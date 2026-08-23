@@ -132,7 +132,15 @@ def main():
                 "genre": old.get("genre", ""),
                 "provenience": old.get("provenience", ""),
                 "language": old.get("language", ""),
-                "split": split_for(tid),
+                # Preserve the row's existing split rather than recomputing
+                # it -- normally a no-op (split_for(tid) is deterministic,
+                # same input same output), except for the rare row whose
+                # split was manually forced outside that scheme (P387407,
+                # a showcase-adjacent example forced into "test"), where
+                # recomputing would silently move it back to whatever the
+                # hash says (found this session: it landed back in
+                # "train").
+                "split": old.get("split") or split_for(tid),
             })
             n_written += 1
 

@@ -73,6 +73,19 @@ def atf_to_lines(raw_text):
     misses = Counter()
     total_tokens = 0
 
+    # qpc (Proto-Elamite) and qpe (Linear Elamite) transliterate as
+    # catalogued sign-numbers (e.g. "M157", "1(N14)"), not real cuneiform
+    # syllables -- _TEXT2SIGN can't resolve them, and a handful of numeral
+    # tokens (Nxx) accidentally DO resolve, letting garbled M/N fragments
+    # leak into 'text' instead of being cleanly dropped as empty (session
+    # 2026-08-22 finding: 200 documents in the corpus were contaminated
+    # this way before this check existed). Every other ATF lang code
+    # observed in our sources (sux, akk, qeb/Eblaite, xhu, qcu, urartian,
+    # hit, uga, ...) is genuine syllabic cuneiform and parses correctly, so
+    # this is a targeted exclusion, not a blanket non-akk/sux filter.
+    if re.search(r"(?m)^#atf:\s*lang\s+(qpc|qpe)\b", raw_text):
+        return [], Counter(), 0
+
     sep = "\n"
     if "\\n" in raw_text and "\n" not in raw_text:
         sep = "\\n"
@@ -95,22 +108,67 @@ def atf_to_lines(raw_text):
                 curr_face = key
             continue
 
-        line = line.replace("{d}", "<D>")
-        for x in re.findall(r"\{.*?\}", line):
-            line = line.replace(x, " " + x[1:-1] + " ")
-        line = line.replace("($ blank space $)", "<S>")
-        line = line.replace("_", " ")
-        line = line.replace("#", "").replace("?", "").replace("!", "")
-        for x in re.findall(r"\[.*?\]", line):
-            line = line.replace(x, "")
+        line = line.replace("($ blank space $)", "<S>").replace("_", " ")
 
         parts = line.split(". ")
         if len(parts) < 2:
             continue
         if len(parts) > 2:
             parts = parts[0], ". ".join(parts[1:])
-        line_num, text = parts
+        line_num, body = parts
 
+        # Two derived strings from here, both starting from the same
+        # unmutated `body` so they stay aligned:
+        #  - raw_out: the flattened transliteration this project actually
+        #    trains/displays on downstream (every caller re-applies
+        #    prepare_hf_dataset.py's clean_transliteration on top of this
+        #    function's "raw" output). Must match that function's own
+        #    documented policy: {...} determinatives -- of ANY kind, {d}
+        #    included, no special case -- dropped entirely with no trace
+        #    (matches _DETERMINATIVE_RE, and Lazar et al. 2021's own
+        #    treatment of the same markup); [...] editorial restorations
+        #    keep their content, only the bracket characters themselves
+        #    are stripped (matches _BRACKET_CHARS -- Section 3 of the
+        #    paper draft states restorations are kept, not discarded, for
+        #    the exact same reason Aeneas gives). An earlier version of
+        #    this function instead mapped {d} to a bare literal "D" glued
+        #    onto the next word with no separator (found via the web demo:
+        #    "Dmarduk" tokenizing as "D"+"##mar"+"##duk" instead of one
+        #    clean word) and deleted [...] spans outright, content and
+        #    all, silently producing orphaned word-fragments with no gap
+        #    marker in their place -- both inconsistent with the policy
+        #    actually documented for the rest of the corpus.
+        #  - sign_src: aggressively stripped (same recipe as before),
+        #    used only to look up Unicode signs below -- losing bracket/
+        #    brace content here doesn't matter, since 'signs' is a
+        #    display-only column, never the model's actual text input.
+        raw_out = re.sub(r"\{[^}]*\}", "", body)
+        raw_out = raw_out.translate(str.maketrans("", "", "[]"))
+        # ATF "!(X)" = the sign was collated/corrected; X is the scribe's
+        # original (rejected) reading, not real content -- drop the whole
+        # unit together. Must happen before the standalone "!" strip below,
+        # or clean_transliteration's generic ()-stripping (which keeps
+        # parenthesized content, e.g. for a genuine alternate reading) has
+        # no way to tell this case apart and keeps "X" glued onto the
+        # previous word with no separator (e.g. "man-za-zu!(SU)" ->
+        # "man-za-zuSU").
+        raw_out = re.sub(r"!\([^)]*\)", "", raw_out)
+        # "#"/"?"/"!" are ATF certainty flags glued directly onto a sign
+        # (damaged-but-probable / uncertain reading / collated correction)
+        # -- not meaningful transliteration content on their own, and not
+        # covered by clean_transliteration downstream, so they must be
+        # dropped here or they leak into training text as stray characters
+        # (e.g. "lu-u#", "kip#-pa#-ti₃#").
+        raw_out = raw_out.replace("#", "").replace("?", "").replace("!", "")
+
+        sign_src = body.replace("{d}", "")
+        for x in re.findall(r"\{.*?\}", sign_src):
+            sign_src = sign_src.replace(x, " " + x[1:-1] + " ")
+        sign_src = sign_src.replace("#", "").replace("?", "").replace("!", "")
+        for x in re.findall(r"\[.*?\]", sign_src):
+            sign_src = sign_src.replace(x, "")
+
+        text = sign_src
         tokens = text.split(" ")
         signs = []
         for i, t in enumerate(tokens):
@@ -145,7 +203,8 @@ def atf_to_lines(raw_text):
                     misses[t] += 1
 
         signs = _remove_spaces(signs)
-        if text.strip():
-            lines_out.append({"raw": text.strip(), "signs": signs, "num": line_num.strip(), "face": curr_face})
+        raw_out = re.sub(r"\s+", " ", raw_out).strip()
+        if text.strip() and raw_out:
+            lines_out.append({"raw": raw_out, "signs": signs, "num": line_num.strip(), "face": curr_face})
 
     return lines_out, misses, total_tokens

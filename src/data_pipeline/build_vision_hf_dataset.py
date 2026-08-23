@@ -69,10 +69,18 @@ def tablet_split_map():
     the text dataset, so the vision rows can be assigned consistently."""
     text_ds = load_from_disk(TEXT_DATASET_DIR)
     mapping = {}
-    for split in ("train", "validation", "test"):
+    for split in ("train", "validation"):
         for tid in set(text_ds[split]["tablet_id"]):
             if tid:
                 mapping[tid] = split
+    # hf_dataset's own DatasetDict never holds a "test" split (prepare_
+    # hf_dataset.py writes it separately to test.jsonl) -- read that too.
+    test_path = os.path.join(BASE_DIR, "data", "processed", "test.jsonl")
+    with open(test_path, encoding="utf-8") as f:
+        for line in f:
+            tid = json.loads(line).get("tablet_id")
+            if tid:
+                mapping[tid] = "test"
     return mapping
 
 
@@ -87,7 +95,8 @@ def bulk_backfill_meta():
     text anywhere, which should stay excluded."""
     meta = {}
     for fname in ("cdli_bulk_documents.jsonl", "ebl_bulk_documents.jsonl", "balance_documents.jsonl",
-                  "text_balance_documents.jsonl", "showcase_documents.jsonl"):
+                  "text_balance_documents.jsonl", "showcase_documents.jsonl",
+                  "new_provenience_images_documents.jsonl"):
         path = os.path.join(BASE_DIR, "data", "interim", fname)
         if not os.path.exists(path):
             continue

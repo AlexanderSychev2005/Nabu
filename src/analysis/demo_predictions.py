@@ -401,6 +401,12 @@ def main():
                               "enables the whole-document English translation line. Not every tablet has all of "
                               "this -- eBL has no translations, CDLI has no inscription record for most literary "
                               "fragments (see session notes on K.3375).")
+    parser.add_argument("--text_override_file", type=str, default=None,
+                         help="Optional {tablet_id: corrected_text} JSON map, applied in-memory after loading --data_dir "
+                              "-- for demo-quality fixes to a tablet's flattened text (e.g. a corpus-building bug found "
+                              "and fixed after --data_dir was already pushed) without re-pushing/re-evaluating the "
+                              "live dataset the reported metrics come from. Model input only; does not touch the "
+                              "dataset on the Hub.")
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
@@ -420,6 +426,16 @@ def main():
     print(f"Loading {args.split} split ({args.hf_config})...")
     ds = load_dataset(args.data_dir, args.hf_config)[args.split]
     print(f"  {len(ds)} rows")
+
+    if args.text_override_file:
+        with open(args.text_override_file, encoding="utf-8") as f:
+            text_overrides = json.load(f)
+        def _apply_override(row):
+            if row["tablet_id"] in text_overrides:
+                row["text"] = text_overrides[row["tablet_id"]]
+            return row
+        ds = ds.map(_apply_override)
+        print(f"  applied text overrides for {sum(1 for t in ds['tablet_id'] if t in text_overrides)}/{len(text_overrides)} requested tablets")
 
     print("Loading tablet image index (for the vision model)...")
     image_index = build_tablet_image_index_from_hf(args.data_dir)
