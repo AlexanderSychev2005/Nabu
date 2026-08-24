@@ -25,6 +25,10 @@ training_output/
 *.bin
 
 papers/
+papers.rar
+
+# Regenerable via compute_embeddings.py -- not worth tracking (175MB)
+results_final/embeddings/
 
 # Old runs, superseded checkpoints/analysis (session 2026-08-12 cleanup)
 archive/

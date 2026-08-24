@@ -19,6 +19,52 @@ from src.training.train_mbert import (
 )
 
 
+def levenshtein(a, b):
+    """Plain character-level edit distance (no external dependency needed
+    for the short WordPiece-token strings this is used on)."""
+    if a == b:
+        return 0
+    la, lb = len(a), len(b)
+    if la == 0:
+        return lb
+    if lb == 0:
+        return la
+    prev = list(range(lb + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i] + [0] * lb
+        for j, cb in enumerate(b, 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb))
+        prev = cur
+    return prev[lb]
+
+
+def mlm_cer(preds, label_ids, tokenizer):
+    """Character-level restoration error for the masked positions, unlike
+    Aeneas/Ithaca's CER this is NOT length-stratified: their stratification
+    (average per masked-span-length, then average across lengths 1-20)
+    exists to stop whichever span length is most common in their designed-
+    damage protocol from dominating the score. Our masking is mBERT's
+    standard random per-token 15% MLM, not a designed span of chosen
+    character length, so that correction doesn't apply here -- a single
+    pooled edit_distance/length ratio over all masked positions is the
+    honest number for this masking scheme.
+
+    preds[0] is mlm_top5 (top-5 token ids per position), label_ids[0] is
+    the MLM label tensor (-100 at unmasked positions) -- both already
+    computed by make_preprocess_logits_for_metrics/compute_metrics above.
+    """
+    top1 = np.asarray(preds[0]).reshape(-1, 5)[:, 0]
+    labels = np.asarray(label_ids[0]).reshape(-1)
+    mask = labels != -100
+    total_edits, total_chars = 0, 0
+    for pred_id, true_id in zip(top1[mask].tolist(), labels[mask].tolist()):
+        pred_str = tokenizer.convert_ids_to_tokens(pred_id).removeprefix("##")
+        true_str = tokenizer.convert_ids_to_tokens(true_id).removeprefix("##")
+        total_edits += levenshtein(pred_str, true_str)
+        total_chars += len(true_str)
+    return total_edits / total_chars if total_chars else 0.0
+
+
 def per_class_report(preds_by_task, labels_by_task, label_configs):
     """Per-VALUE precision/recall/f1/support for each metadata task --
     compute_metrics (train_mbert.py) only reports the macro average, which
@@ -162,6 +208,8 @@ if __name__ == "__main__":
 
     preds = pred_output.predictions
     label_ids = pred_output.label_ids
+    metrics["mlm_cer"] = mlm_cer(preds, label_ids, tokenizer)
+    print(f"  mlm_cer: {metrics['mlm_cer']}")
     preds_by_task = {task: np.asarray(preds[i + 2]).reshape(-1) for i, task in enumerate(tasks)}
     labels_by_task = {task: np.asarray(label_ids[i + 1]).reshape(-1) for i, task in enumerate(tasks)}
     per_class = per_class_report(preds_by_task, labels_by_task, label_configs)

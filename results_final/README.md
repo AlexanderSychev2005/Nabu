@@ -1,18 +1,22 @@
-# Final test-split evaluation (session 2026-08-13, updated after adding P387407)
+# Final test-split evaluation (session 2026-08-24, post corpus-rebuild retrain)
 
-First and only time either checkpoint touched the `test` split — every
-number quoted earlier in the session (validation, used for checkpoint
-selection during training) is a different, slightly less strict split. This
-is the number to actually cite.
+Numbers below are from the final checkpoints (`checkpoints_final_text`,
+`checkpoints_final_vision`) trained after this session's full corpus rebuild
+(Proto-Elamite exclusion, train/test tablet_id leakage fix, empty-text
+filtering, provenience expansion 12→36 classes) — superseding every number
+quoted from before that rebuild. First and only time either checkpoint
+touched the `test` split — every number quoted earlier (validation, used for
+checkpoint selection during training) is a different, slightly less strict
+split. This is the number to actually cite.
 
 ## Files
 
-- `metrics_text.json` — `checkpoints_final_text` on `test` (3107 tablets):
-  aggregate metrics (MLM MRR/Hit@k, per-head accuracy + macro-F1) and a
+- `metrics_text.json` — `checkpoints_final_text` on `test` (3,046 tablets):
+  aggregate metrics (MLM MRR/Hit@k/CER, per-head accuracy + macro-F1) and a
   full per-class precision/recall/F1/support breakdown for all 4 metadata
   heads.
 - `metrics_vision.json` — same, `checkpoints_final_vision` (provenience
-  image-conditioned), 377 tablets in the `vision` config's test split.
+  image-conditioned), 513 tablets in the `vision` config's test split.
 - `metrics_untrained.json` — the zero-finetuning baseline: plain
   `bert-base-multilingual-cased`'s own pretrained weights (untouched) +
   freshly random-initialized metadata heads, evaluated the same way on the
@@ -62,40 +66,45 @@ is the number to actually cite.
 
 | | untrained (no finetuning) | text-only | vision (provenience) |
 |---|---|---|---|
-| mlm_mrr | 0.512 | 0.797 | 0.799 |
-| mlm_top5_acc | 0.561 | 0.867 | 0.867 |
-| period macro-F1 | 0.062 | 0.838 | 0.854 |
-| genre macro-F1 | 0.053 | 0.840 | 0.855 |
-| language macro-F1 | 0.071 | 0.846 | 0.841 |
-| **provenience macro-F1** | 0.023 | **0.727** | **0.768** |
+| mlm_mrr | 0.508 | 0.780 | 0.781 |
+| mlm_acc (top-1) | 0.460 | 0.719 | 0.721 |
+| mlm_top3_acc | 0.527 | 0.815 | 0.816 |
+| mlm_top5_acc | 0.556 | 0.851 | 0.852 |
+| mlm_cer | 0.640 | 0.314 | 0.312 |
+| period acc / macro-F1 | 0.257 / 0.064 | 0.907 / 0.805 | 0.908 / 0.799 |
+| genre acc / macro-F1 | 0.084 / 0.045 | 0.914 / 0.850 | 0.915 / 0.850 |
+| language acc / macro-F1 | 0.088 / 0.057 | 0.968 / 0.705 | 0.969 / 0.728 |
+| **provenience acc / macro-F1** | 0.003 / 0.002 | 0.714 / **0.449** | 0.751 / **0.541** |
+
+`mlm_cer` is a pooled character-level edit-distance ratio over every masked
+position's top-1 restoration (see `evaluate_mbert.py`'s `mlm_cer` /
+`docs/paper_draft.md`'s Methods section for the exact definition and why it
+is *not* stratified by masked-span length the way Aeneas/Ithaca's own CER
+is — our masking is standard random-15%-of-tokens MLM, not a designed span
+of chosen character length, so their length-stratification doesn't apply
+here as-is).
 
 The untrained column confirms neither result is free: mBERT's own
-pretraining gets restoration to a non-trivial MRR 0.51 zero-shot (matching
-Lazar et al. 2021's own point that multilingual pretraining transfers
-usefully to Akkadian on its own), but the metadata heads are exactly what
-random Linear-layer init on a 4-96-class problem looks like -- effectively
-chance, several classes collapsed to 0 F1 (see `metrics_untrained.json`'s
-per-class breakdown). All four heads' real signal comes entirely from this
-project's finetuning, not from the backbone alone.
+pretraining gets restoration to a non-trivial MRR 0.51 / CER 0.64 zero-shot
+(matching Lazar et al. 2021's own point that multilingual pretraining
+transfers usefully to Akkadian on its own), but the metadata heads are
+exactly what random Linear-layer init on a 4/6/9/36-class problem looks
+like -- effectively chance, several provenience classes collapsed to 0 F1
+(see `metrics_untrained.json`'s per-class breakdown). All four heads' real
+signal comes entirely from this project's finetuning, not from the backbone
+alone.
 
-Vision vs. text-only matches the validation-split finding closely (+0.042
-here vs. +0.039-0.041 on validation) — the provenience effect holds on
-genuinely held-out data, not just the split used for checkpoint selection
-during training. Period/
-genre/language moving by a few points here (in both directions) is the same
-ordinary run-to-run noise already characterized via the controlled ablation
-in `docs/final_results.md` -- not a new finding, don't read a single-run
-test-split number as reopening that question.
-
-## P387407 addition
-
-Added this session (found by the user on cdli.earth, has both a real photo
-and full ATF transliteration in the official CDLI bulk dump -- see
-`docs/final_results.md`'s git history / commit `31e450b`). Forced into
-`test`, hence the split growing from 3106->3107 documents / 376->377 vision
-tablets and this file's numbers moving slightly from the previous version
-(one additional tablet out of 3107 has negligible effect on aggregate
-metrics, but is now included for consistency).
+Provenience macro-F1 gains +0.092 (0.449→0.541) with vision, the strongest
+replication yet of the central finding (see `docs/paper_draft.md` Section
+5 for the earlier, 12-class-provenience version of this same result, from
+before this session's corpus rebuild expanded provenience to 36 classes).
+Language macro-F1 -- which never receives the image in any run, the
+noise-floor head -- moves by a much smaller +0.023; period and genre move
+by less than ±0.006 in either direction. `mlm_cer` moves by essentially
+nothing (0.314→0.312) between the two checkpoints, as expected: the image
+only reaches the provenience head, never the restoration head, so
+restoration performance should not depend on whether the checkpoint was
+trained with or without vision conditioning.
 
 ## Reading the demo files
 

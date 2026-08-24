@@ -1,0 +1,414 @@
+{
+  "metrics": {
+    "loss": 26.285104751586914,
+    "model_preparation_time": 0.0043,
+    "period_acc": 0.25698888514651397,
+    "period_macro_f1": 0.0634973437734109,
+    "genre_acc": 0.08349074423876086,
+    "genre_macro_f1": 0.04505879060470832,
+    "language_acc": 0.08799342105263158,
+    "language_macro_f1": 0.05702690270818154,
+    "provenience_acc": 0.003335804299481097,
+    "provenience_macro_f1": 0.001499028841764284,
+    "mlm_acc": 0.45947575121015616,
+    "mlm_top3_acc": 0.527116631655859,
+    "mlm_top5_acc": 0.5557950497762353,
+    "mlm_mrr": 0.5081373875687032,
+    "runtime": 573.6006,
+    "samples_per_second": 5.31,
+    "steps_per_second": 1.328,
+    "mlm_cer": 0.6398111776492297
+  },
+  "per_class": {
+    "period": {
+      "Neo-Assyrian": {
+        "precision": 0.09259259259259259,
+        "recall": 0.009708737864077669,
+        "f1-score": 0.01757469244288225,
+        "support": 515.0
+      },
+      "Ur III": {
+        "precision": 0.3555023923444976,
+        "recall": 0.5786604361370716,
+        "f1-score": 0.44042679312388855,
+        "support": 1284.0
+      },
+      "Old Babylonian": {
+        "precision": 0.045454545454545456,
+        "recall": 0.00205761316872428,
+        "f1-score": 0.003937007874015748,
+        "support": 486.0
+      },
+      "Old Assyrian": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 138.0
+      },
+      "Middle Assyrian": {
+        "precision": 0.08860759493670886,
+        "recall": 0.05737704918032787,
+        "f1-score": 0.06965174129353234,
+        "support": 122.0
+      },
+      "Middle Babylonian": {
+        "precision": 0.008955223880597015,
+        "recall": 0.06666666666666667,
+        "f1-score": 0.015789473684210527,
+        "support": 90.0
+      },
+      "Neo-Babylonian": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 67.0
+      },
+      "Third Millennium": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 238.0
+      },
+      "Late Antiquity": {
+        "precision": 0.018518518518518517,
+        "recall": 0.034482758620689655,
+        "f1-score": 0.024096385542168676,
+        "support": 29.0
+      },
+      "accuracy": 0.25698888514651397,
+      "macro avg": {
+        "precision": 0.06773676308082889,
+        "recall": 0.08321702907083975,
+        "f1-score": 0.0634973437734109,
+        "support": 2969.0
+      },
+      "weighted avg": {
+        "precision": 0.18133859879252223,
+        "recall": 0.25698888514651397,
+        "f1-score": 0.19773988381813457,
+        "support": 2969.0
+      }
+    },
+    "genre": {
+      "Administrative": {
+        "precision": 0.5,
+        "recall": 0.0005878894767783657,
+        "f1-score": 0.0011743981209630064,
+        "support": 1701.0
+      },
+      "Lexical": {
+        "precision": 0.05341246290801187,
+        "recall": 0.2727272727272727,
+        "f1-score": 0.08933002481389578,
+        "support": 198.0
+      },
+      "Royal Inscriptions": {
+        "precision": 0.10196560196560196,
+        "recall": 0.7614678899082569,
+        "f1-score": 0.17984832069339113,
+        "support": 218.0
+      },
+      "Literary & Scholarly": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 199.0
+      },
+      "Legal": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 166.0
+      },
+      "Letters": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 165.0
+      },
+      "accuracy": 0.08349074423876086,
+      "macro avg": {
+        "precision": 0.10922967747893564,
+        "recall": 0.17246384201871798,
+        "f1-score": 0.04505879060470832,
+        "support": 2647.0
+      },
+      "weighted avg": {
+        "precision": 0.333700101580766,
+        "recall": 0.08349074423876086,
+        "f1-score": 0.02224855686742301,
+        "support": 2647.0
+      }
+    },
+    "language": {
+      "Akkadian": {
+        "precision": 0.17497812773403323,
+        "recall": 0.2503128911138924,
+        "f1-score": 0.2059732234809475,
+        "support": 799.0
+      },
+      "Sumerian": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 1550.0
+      },
+      "Bilingual": {
+        "precision": 0.011263073209975865,
+        "recall": 0.6363636363636364,
+        "f1-score": 0.022134387351778657,
+        "support": 22.0
+      },
+      "Peripheral/Other": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 61.0
+      },
+      "accuracy": 0.08799342105263158,
+      "macro avg": {
+        "precision": 0.04656030023600227,
+        "recall": 0.2216691318693822,
+        "f1-score": 0.05702690270818154,
+        "support": 2432.0
+      },
+      "weighted avg": {
+        "precision": 0.05758853275909211,
+        "recall": 0.08799342105263158,
+        "f1-score": 0.06786988572492442,
+        "support": 2432.0
+      }
+    },
+    "provenience": {
+      "Nineveh": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 432.0
+      },
+      "Umma": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 647.0
+      },
+      "Girsu": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 243.0
+      },
+      "Nippur": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 224.0
+      },
+      "Puzriš-Dagan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 305.0
+      },
+      "Kanesh": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 131.0
+      },
+      "Assur": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 115.0
+      },
+      "Uruk": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 59.0
+      },
+      "Ur": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 73.0
+      },
+      "Ugarit": {
+        "precision": 0.004830917874396135,
+        "recall": 0.022222222222222223,
+        "f1-score": 0.007936507936507936,
+        "support": 45.0
+      },
+      "Sippar": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 86.0
+      },
+      "Nimrud": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 30.0
+      },
+      "Hattusa": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 9.0
+      },
+      "Mari": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 6.0
+      },
+      "Ebla": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 14.0
+      },
+      "Susa": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 2.0
+      },
+      "Babylon": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 20.0
+      },
+      "Nuzi": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 10.0
+      },
+      "Irisagrig": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 4.0
+      },
+      "Persepolis": {
+        "precision": 0.0019138755980861245,
+        "recall": 0.25,
+        "f1-score": 0.003798670465337132,
+        "support": 8.0
+      },
+      "Kish": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 9.0
+      },
+      "Larsa": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 30.0
+      },
+      "Garšana": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 35.0
+      },
+      "Emar": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 12.0
+      },
+      "Isin": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 43.0
+      },
+      "Ešnunna": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 7.0
+      },
+      "Šaduppum": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 3.0
+      },
+      "Nerebtum": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 9.0
+      },
+      "Šuruppak": {
+        "precision": 0.019867549668874173,
+        "recall": 0.3,
+        "f1-score": 0.037267080745341616,
+        "support": 10.0
+      },
+      "Kisurra": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 13.0
+      },
+      "Adab": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 28.0
+      },
+      "Huzirina": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 4.0
+      },
+      "Pī-Kasî": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 10.0
+      },
+      "Tuttul": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 15.0
+      },
+      "Amarna": {
+        "precision": 0.0024916943521594683,
+        "recall": 0.6,
+        "f1-score": 0.004962779156327543,
+        "support": 5.0
+      },
+      "Zabalam": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 2.0
+      },
+      "accuracy": 0.003335804299481097,
+      "macro avg": {
+        "precision": 0.0008084454859309972,
+        "recall": 0.032561728395061725,
+        "f1-score": 0.001499028841764284,
+        "support": 2698.0
+      },
+      "weighted avg": {
+        "precision": 0.00016450566255821132,
+        "recall": 0.003335804299481097,
+        "f1-score": 0.00029096253673113715,
+        "support": 2698.0
+      }
+    }
+  }
+}
