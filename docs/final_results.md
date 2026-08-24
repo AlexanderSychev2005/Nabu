@@ -1,4 +1,17 @@
-# Final results (session 2026-08-13)
+# Final results (session 2026-08-13) — SUPERSEDED, kept for the ablation methodology
+
+**These numbers are from the original 12-class-provenience corpus, before this
+project's later full corpus rebuild** (Proto-Elamite exclusion, train/test
+tablet-id leak fix, provenience expansion 12→36 classes) **and retrain.**
+`checkpoints_final_text`/`checkpoints_final_vision` on disk now hold the
+*retrained* weights, not the ones this file's table describes. For current
+numbers see `docs/paper_draft.md`'s Results section and `results_final/README.md`.
+
+This file is kept because the six-run ablation below (which head benefits
+from vision) is the methodology later reapplied at the new 36-class scale —
+only the specific numbers are stale, the experimental design and its
+conclusion (only `provenience_head` should see the image) are not, and were
+independently reconfirmed post-rebuild.
 
 Two deliverable models, both mBERT multi-task (period/genre/language/
 provenience heads + MLM), trained on the `documents` HF config

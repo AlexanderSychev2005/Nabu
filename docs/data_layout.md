@@ -20,10 +20,14 @@ build machinery in between.
 ## interim/ -- per-source parsed, not yet merged (regenerate via
 prepare_cuneiml.py / prepare_oracc.py / prepare_cdli_bulk.py / etc.)
 - `cuneiml.jsonl`, `oracc.jsonl` -- one row per transliterated line
-- `{cdli_bulk,ebl_bulk,balance,text_balance}_documents.jsonl` -- session
-  2026-08-12's backfills, one row per *tablet* already (not per line),
-  verified through CuneiML's own sign parser + deduped against the main
-  corpus (see reprocess_bulk_documents.py)
+- `{cdli_bulk,ebl_bulk,balance,text_balance,showcase,new_provenience_images}_documents.jsonl`
+  -- backfills (sessions 2026-08-12 and 2026-08-23), one row per *tablet*
+  already (not per line), verified through CuneiML's own sign parser +
+  deduped against the main corpus (see reprocess_bulk_documents.py). The
+  last two were added during this project's provenience-expansion corpus
+  rebuild -- `showcase_documents.jsonl` force-places specific tablets into
+  `test`, `new_provenience_images_documents.jsonl` covers the 24 new
+  provenience classes' text+photo backfill.
 
 ## processed/ -- merged, split, ready
 - `combined_unique.jsonl` -- cuneiml.jsonl + oracc.jsonl merged and
@@ -35,7 +39,7 @@ prepare_cuneiml.py / prepare_oracc.py / prepare_cdli_bulk.py / etc.)
 - `hf_dataset_documents` -- one row per tablet, CuneiML+ORACC only (base,
   before this session's backfill)
 - `hf_dataset_documents_with_cdli_bulk` -- **the actual training config**
-  ("documents" on the Hub): base + the 4 interim backfill files above
+  ("documents" on the Hub): base + the 6 interim backfill files above
 - `hf_dataset_vision` -- **the actual training config** ("vision" on the
   Hub): one row per photographed tablet, provenience-only relevant now
   (train_mbert.py only feeds images into the provenience head)
