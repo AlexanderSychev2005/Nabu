@@ -2,7 +2,7 @@
 
 Two real tiers: **raw** (untouched external sources) and **ready for
 training** (what `train_mbert.py` actually loads, pushed to
-`AlexSychovUN/Iskander-Dataset` on HF Hub). Everything else is regeneratable
+`AlexSychovUN/Nabu-Dataset` on HF Hub). Everything else is regeneratable
 build machinery in between.
 
 ## raw/ -- sources, never modified by our own code

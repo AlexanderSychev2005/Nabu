@@ -1,4 +1,4 @@
-"""Web demo for the trained Iskander (Akkadian mBERT) checkpoints -- same
+"""Web demo for the trained Nabu (Akkadian mBERT) checkpoints -- same
 stack as kyivan/src/web (FastAPI + a static vanilla-JS page, no separate
 frontend build): a single-page tool is plenty for one input box, one image
 slot and a handful of result panels, and this keeps the whole project
@@ -47,7 +47,7 @@ MODEL_NAME = "bert-base-multilingual-cased"
 TASKS = ["period", "genre", "language", "provenience"]
 MAX_LENGTH = 96
 
-app = FastAPI(title="Iskander Web")
+app = FastAPI(title="Nabu Web")
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

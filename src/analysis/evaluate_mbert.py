@@ -102,7 +102,7 @@ if __name__ == "__main__":
                               "all) with freshly random-initialized metadata heads. The zero-shot/no-finetuning "
                               "baseline Lazar et al. 2021 also report (their Table 2).")
     parser.add_argument("--seed", type=int, default=42, help="Only matters for --untrained (random head init)")
-    parser.add_argument("--data_dir", type=str, default="AlexSychovUN/Iskander-Dataset")
+    parser.add_argument("--data_dir", type=str, default="AlexSychovUN/Nabu-Dataset")
     parser.add_argument("--hf_config", type=str, default="default", help="'default' (line-level) or 'documents' (tablet-level)")
     parser.add_argument("--split", type=str, default="validation", choices=["validation", "test"], help="Use 'validation' while iterating, 'test' only for the final reported number")
     parser.add_argument("--label_config", type=str, default=None)

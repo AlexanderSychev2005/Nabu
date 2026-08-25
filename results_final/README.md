@@ -135,34 +135,34 @@ trained with or without vision conditioning.
 ```bash
 uv run python src/analysis/evaluate_mbert.py \
   --checkpoint checkpoints_final_text/final_model \
-  --data_dir AlexSychovUN/Iskander-Dataset --hf_config documents --split test \
+  --data_dir AlexSychovUN/Nabu-Dataset --hf_config documents --split test \
   --context_char_max 850 --max_length 512 --batch_size 4 \
   --output_file results_final/metrics_text.json
 
 uv run python src/analysis/evaluate_mbert.py \
   --checkpoint checkpoints_final_vision/final_model \
-  --data_dir AlexSychovUN/Iskander-Dataset --hf_config documents --split test \
+  --data_dir AlexSychovUN/Nabu-Dataset --hf_config documents --split test \
   --context_char_max 850 --max_length 512 --batch_size 4 \
   --use_image --vision_init finetune --images_from_hf \
   --output_file results_final/metrics_vision.json
 
 uv run python src/analysis/evaluate_mbert.py \
   --checkpoint checkpoints_final_text/final_model --untrained \
-  --data_dir AlexSychovUN/Iskander-Dataset --hf_config documents --split test \
+  --data_dir AlexSychovUN/Nabu-Dataset --hf_config documents --split test \
   --context_char_max 850 --max_length 512 --batch_size 4 \
   --output_file results_final/metrics_untrained.json
 
 uv run python src/analysis/demo_predictions.py \
   --text_checkpoint checkpoints_final_text/final_model \
   --vision_checkpoint checkpoints_final_vision/final_model \
-  --data_dir AlexSychovUN/Iskander-Dataset --hf_config documents --split test \
+  --data_dir AlexSychovUN/Nabu-Dataset --hf_config documents --split test \
   --n_examples 20 --context_char_max 850 --max_length 512 --embed_images --fetch_cdli_info --seed 42 \
   --output_file results_final/predictions_demo.md
 
 uv run python src/analysis/demo_predictions.py \
   --text_checkpoint checkpoints_final_text/final_model \
   --vision_checkpoint checkpoints_final_vision/final_model \
-  --data_dir AlexSychovUN/Iskander-Dataset --hf_config documents --split test \
+  --data_dir AlexSychovUN/Nabu-Dataset --hf_config documents --split test \
   --tablet_ids "P273207,P285823,P273223,P402919,ebl:BM.42004,P404643,P402685,P387407" \
   --context_char_max 850 --max_length 512 --embed_images --fetch_cdli_info \
   --output_file results_final/predictions_demo_showcase.md
