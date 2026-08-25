@@ -1,10 +1,18 @@
 """Offline: compute and save one document embedding (interpret.py's
 document_embedding -- Aeneas-style 0.5*([CLS] + mean of the rest)) per
 tablet, for the web demo's similar-document lookup (src/web/app.py). No
-retraining -- reuses the already fine-tuned text-only checkpoint, so this
-works for every document regardless of whether it has a photo.
+retraining -- reuses the already fine-tuned checkpoint. Uses
+checkpoints_final_vision (not checkpoints_final_text) to match app.py's own
+single-model-at-inference design (session 2026-08-24): app.py now always
+queries checkpoints_final_vision, so a live query embedding and this
+precomputed corpus must come from the same backbone weights, or their
+cosine similarity would be comparing two different embedding spaces.
+document_embedding() itself never touches the image branch (it only reads
+model.backbone.bert's hidden states), so this works for every document
+regardless of whether it has a photo -- use_image=True below is only there
+because it's required to load the vision checkpoint's full state_dict.
 
-Run once (re-run only if the corpus or checkpoints_final_text changes):
+Run once (re-run only if the corpus or checkpoints_final_vision changes):
 
     python src/analysis/compute_embeddings.py
 
@@ -32,7 +40,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint", default=os.path.join(BASE_DIR, "checkpoints_final_text", "final_model"))
+    parser.add_argument("--checkpoint", default=os.path.join(BASE_DIR, "checkpoints_final_vision", "final_model"))
     parser.add_argument("--data_dir", default="AlexSychovUN/Nabu-Dataset")
     parser.add_argument("--hf_config", default="documents")
     parser.add_argument("--model_name", default="bert-base-multilingual-cased")
@@ -53,7 +61,8 @@ if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained(args.checkpoint, use_fast=False)
     model = MBertMultiTask(
         args.model_name, num_period=num_labels["period"], num_genre=num_labels["genre"],
-        num_language=num_labels["language"], num_provenience=num_labels["provenience"], use_image=False,
+        num_language=num_labels["language"], num_provenience=num_labels["provenience"],
+        use_image=True, vision_init="finetune",
     )
     state_dict = load_file(os.path.join(args.checkpoint, "model.safetensors"))
     model.load_state_dict(state_dict)
@@ -82,6 +91,8 @@ if __name__ == "__main__":
                 "genre": label_name("genre", row["genre_labels"]),
                 "language": label_name("language", row["language_labels"]),
                 "provenience": label_name("provenience", row["provenience_labels"]),
+                "text": row["text"],
+                "signs": " ".join(row["signs"]) if row["signs"] else "",
             })
 
     os.makedirs(args.out_dir, exist_ok=True)

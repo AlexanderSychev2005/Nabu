@@ -185,3 +185,124 @@ code { background: var(--clay); padding: 1px 5px; border-radius: 4px; }
     padding-bottom: 2rem;
 }
 @media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } }
+
+.instructions-box {
+    background: var(--clay);
+    border: 1px solid var(--clay-dark);
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+.instructions-list { margin: 0; padding-left: 1.1em; font-size: 0.82rem; line-height: 1.55; color: var(--ink); }
+.instructions-list li { margin-bottom: 6px; }
+.instructions-list li:last-child { margin-bottom: 0; }
+
+.icon-btn {
+    font-family: monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border: 1px solid var(--seal);
+    background: white;
+    color: var(--seal);
+    border-radius: 4px;
+    cursor: pointer;
+}
+.icon-btn:hover { background: var(--seal); color: white; }
+
+.temp-row { display: flex; align-items: baseline; justify-content: space-between; }
+#temp-value { font-family: monospace; font-weight: 600; color: var(--seal); font-size: 0.85rem; }
+input[type="range"] { width: 100%; accent-color: var(--seal); }
+
+.mode-toggle { display: flex; gap: 8px; }
+.mode-btn {
+    flex: 1;
+    padding: 10px 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border: 1.5px solid var(--clay-dark);
+    background: white;
+    color: var(--ink);
+    border-radius: 8px;
+    cursor: pointer;
+}
+.mode-btn.active { background: var(--ink); color: white; border-color: var(--ink); }
+
+.best-reading {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    padding: 10px 12px;
+    background: var(--clay);
+    border-radius: 8px;
+}
+.best-reading .section-label { color: var(--stone); }
+
+.btn-show-more {
+    display: block;
+    margin: 4px auto 0 auto;
+    padding: 8px 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border: 1.5px solid var(--clay-dark);
+    background: white;
+    color: var(--ink);
+    border-radius: 20px;
+    cursor: pointer;
+}
+.btn-show-more:hover { border-color: var(--seal); color: var(--seal); }
+
+.similar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.similar-card {
+    border: 1px solid #E9E0D0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    background: var(--parchment);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.similar-card:hover { border-color: var(--seal); }
+.similar-card-id { font-family: monospace; font-size: 0.75rem; font-weight: 600; color: var(--stone); }
+.similar-card-preview { font-size: 0.82rem; line-height: 1.4; flex: 1; }
+.similar-card-tags { font-size: 0.72rem; color: var(--stone); }
+.similar-card-score-row { display: flex; align-items: center; gap: 6px; }
+.similar-score-bar-wrap { flex: 1; background: var(--clay); border-radius: 4px; height: 6px; overflow: hidden; }
+.similar-score-bar { height: 100%; background: var(--seal); }
+.similar-score-pct { font-size: 0.72rem; font-weight: 600; color: var(--seal); font-family: monospace; }
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(43, 36, 32, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 24px;
+}
+.modal-box {
+    background: white;
+    border-radius: 12px;
+    max-width: 640px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 24px 28px;
+    position: relative;
+}
+.modal-close {
+    position: absolute;
+    top: 12px; right: 16px;
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--stone);
+    cursor: pointer;
+}
+.modal-close:hover { color: var(--seal); }
+.modal-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; }
+.modal-tags { font-size: 0.8rem; color: var(--stone); margin-bottom: 14px; }
+.modal-section-label { font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--stone); font-weight: 600; margin: 14px 0 4px 0; }
+.modal-signs { font-size: 1.3rem; line-height: 1.8; }
+.modal-text { font-size: 0.9rem; line-height: 1.6; }

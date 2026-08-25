@@ -27,22 +27,28 @@
 
         <!-- LEFT COLUMN -->
         <div>
+            <div class="instructions-box mb-4">
+                <span class="section-label">How to use</span>
+                <ul class="instructions-list">
+                    <li>Type or paste a transliteration below, including spaces.</li>
+                    <li>Click <button type="button" class="icon-btn" id="insert-mask-btn" title="Insert [MASK] at the cursor">[MASK]</button>
+                        to mark a position you want restored, or click anywhere in the text box and press it again for another one.
+                        Leave none and a random 15% of positions get auto-masked instead.</li>
+                    <li>Use <code>x</code> for a single sign of unclear reading and <code>...</code> for a gap of unknown
+                        length -- both are read as context only. Our model predicts one sub-word token at a time, so
+                        unlike Aeneas's own arbitrary-length restoration, an unknown-length gap is not itself restored,
+                        only marked.</li>
+                    <li>A tablet photo is optional and only ever affects the provenience head.</li>
+                </ul>
+            </div>
+
             <div class="mb-4">
                 <span class="section-label">Transliteration</span>
-                <p style="font-size:0.85rem;color:var(--stone);margin:0 0 10px 0;">
-                    Type <code>[MASK]</code> where you want the model to restore a position.
-                    Use <code>x</code> for a single sign of unclear reading, and <code>...</code> for a gap of
-                    unknown length -- both are context only, never masked and never offered as an answer.
-                    Leave no <code>[MASK]</code> and a random 15% of positions get auto-masked instead.
-                </p>
-                <textarea id="input-text" rows="7" placeholder="um-ma i-din-{d}suen-ma x-bi2-ma ... a-na zi-nu-u2"></textarea>
+                <textarea id="input-text" rows="6" placeholder="um-ma i-din-{d}suen-ma x-bi2-ma ... a-na zi-nu-u2"></textarea>
             </div>
 
             <div class="mb-4">
                 <span class="section-label">Tablet photo (optional)</span>
-                <p style="font-size:0.8rem;color:var(--stone);margin:0 0 8px 0;">
-                    Only affects the provenience head -- every other head always runs on text alone.
-                </p>
                 <input type="file" id="image-input" accept="image/*">
                 <div id="image-preview-wrap" class="hidden mt-2">
                     <canvas id="image-canvas" width="224" height="224"></canvas>
@@ -50,6 +56,22 @@
                         <input type="checkbox" id="gradcam-toggle" checked> show Grad-CAM (provenience)
                     </label>
                 </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="temp-row">
+                    <span class="section-label" style="margin-bottom:0;">Restoration sampling temperature</span>
+                    <span id="temp-value">1.0</span>
+                </div>
+                <input type="range" id="temp-slider" min="0.1" max="2" step="0.1" value="1.0">
+                <p style="font-size:0.75rem;color:var(--stone);margin:2px 0 0 0;">
+                    Lower is more conservative (favors the most formulaic reading), higher is more exploratory.
+                </p>
+            </div>
+
+            <div class="mode-toggle mb-4">
+                <button class="mode-btn active" id="mode-restore" data-restore="true">Restore &amp; Attribute</button>
+                <button class="mode-btn" id="mode-attribute" data-restore="false">Attribute Only</button>
             </div>
 
             <button class="btn-analyze" id="analyze-btn">Analyze</button>
@@ -73,35 +95,55 @@
 
                 <div id="truncation-warning" class="hidden warning-banner"></div>
 
-                <div class="result-card">
-                    <div class="card-label">Text (click a mask to see its candidates)</div>
-                    <div id="output-text" style="font-size:1.05rem;line-height:2;"></div>
+                <div id="similar-card" class="result-card hidden">
+                    <div class="card-label">Similar documents</div>
+                    <p style="font-size:0.78rem;color:var(--stone);margin:0 0 10px 0;">
+                        Nearest neighbours by document embedding, across the whole corpus (train, validation and test
+                        alike -- this doesn't affect any model prediction).
+                    </p>
+                    <div id="similar-grid" class="similar-grid"></div>
+                    <button id="similar-more-btn" class="btn-show-more hidden">Show more</button>
+                </div>
+
+                <div id="restoration-card" class="result-card hidden">
+                    <div class="card-label">Restoration</div>
+                    <div id="best-reading" class="best-reading"></div>
+                    <div id="output-text" style="font-size:1.05rem;line-height:2;margin-top:10px;"></div>
                     <div id="mask-picker" class="flex flex-wrap gap-1" style="margin-top:10px;"></div>
                     <div id="topk-panel" class="hidden" style="margin-top:10px;"></div>
                 </div>
 
+                <div id="saliency-card" class="result-card hidden">
+                    <div class="card-label">Saliency map</div>
+                    <p style="font-size:0.78rem;color:var(--stone);margin:0 0 10px 0;">
+                        Which input tokens most influenced the selected prediction (darker = more influence).
+                    </p>
+                    <div id="saliency-picker" class="flex flex-wrap gap-1" style="margin-bottom:10px;"></div>
+                    <div id="saliency-text" style="font-size:1.02rem;line-height:2;"></div>
+                </div>
+
                 <div class="result-card">
-                    <div class="card-label">Attribution (from text)</div>
+                    <div class="card-label">Attribution</div>
                     <div id="metadata-cards"></div>
                     <div id="prov-map" class="map-box hidden"></div>
                 </div>
 
                 <div id="vision-card" class="result-card hidden">
-                    <div class="card-label">Provenience -- with photo</div>
-                    <div id="vision-result"></div>
-                    <div class="chart-wrap"><canvas id="vision-chart"></canvas></div>
-                    <div id="vision-map" class="map-box hidden"></div>
-                    <canvas id="gradcam-canvas" width="224" height="224" style="margin-top:10px;border-radius:6px;"></canvas>
-                </div>
-
-                <div id="similar-card" class="result-card hidden">
-                    <div class="card-label">Similar documents</div>
-                    <div id="similar-list"></div>
+                    <div class="card-label">Provenience -- what the photo contributed</div>
+                    <canvas id="gradcam-canvas" width="224" height="224" style="border-radius:6px;"></canvas>
                 </div>
 
             </div>
         </div>
     </main>
+
+    <!-- Similar-document detail modal -->
+    <div id="doc-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <button id="doc-modal-close" class="modal-close">&times;</button>
+            <div id="doc-modal-body"></div>
+        </div>
+    </div>
 
     <script src="/static/script.js"></script>
 </body>
