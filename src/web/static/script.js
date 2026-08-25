@@ -273,7 +273,11 @@ function renderBarChart(canvasId, task, allProbs) {
             plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${(c.raw * 100).toFixed(1)}%` } } },
             scales: {
                 x: { min: 0, max: 1, ticks: { callback: (v) => `${(v * 100).toFixed(0)}%` } },
-                y: { ticks: { font: { size: 11 } } },
+                // autoSkip defaults to true and will happily drop a label
+                // it thinks won't fit rather than let two overlap -- with
+                // the container now sized to fit every bar (see
+                // renderMetadata), there's no need for it to skip any.
+                y: { ticks: { font: { size: 11 }, autoSkip: false } },
             },
         },
     });
@@ -306,10 +310,15 @@ function renderMetadata(result) {
     const wrap = $("metadata-cards");
     wrap.innerHTML = "";
     for (const [task, pred] of Object.entries(result.metadata)) {
+        const barCount = task === "provenience" ? Math.min(10, pred.probs.length) : pred.probs.length;
         const block = document.createElement("div");
         block.className = "meta-head";
+        // Height scales with the number of bars actually drawn (not a fixed
+        // 160px for every head) -- otherwise Chart.js's autoSkip silently
+        // drops some y-axis labels rather than overlapping them once a head
+        // like provenience has more bars than a fixed height has room for.
         block.innerHTML = `<div class="meta-head-title">${task}: <b>${pred.label}</b> (${(pred.confidence * 100).toFixed(0)}%)</div>
-            <div class="chart-wrap"><canvas id="chart-${task}"></canvas></div>`;
+            <div class="chart-wrap" style="height:${28 * barCount + 20}px;"><canvas id="chart-${task}"></canvas></div>`;
         wrap.appendChild(block);
         renderBarChart(`chart-${task}`, task, pred.probs);
     }
