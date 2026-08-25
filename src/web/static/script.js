@@ -259,11 +259,7 @@ function renderBarChart(canvasId, task, allProbs) {
     chartInstances[task] = new Chart(ctx, {
         type: "bar",
         data: {
-            // Percentage baked into the label itself, not just the hover
-            // tooltip -- otherwise the smaller bars' own values are
-            // impossible to read at a glance (their bar is too short to
-            // print a number inside, and nothing shows without hovering).
-            labels: sorted.map((c) => `${c.label} (${(c.prob * 100).toFixed(0)}%)`),
+            labels: sorted.map((c) => c.label),
             datasets: [{
                 data: sorted.map((c) => c.prob),
                 backgroundColor: sorted.map((c) => (c.label === topLabel ? SEAL : CLAY)),
