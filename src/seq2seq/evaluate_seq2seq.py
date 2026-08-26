@@ -37,6 +37,9 @@ def main() -> None:
     parser.add_argument("--num_beams", type=int, default=1)
     parser.add_argument("--data_dir", type=str, default=DEFAULT_REPO_ID,
                          help="HF repo id (default), or a local data/processed/hf_dataset_<task> path")
+    parser.add_argument("--split", choices=["validation", "test"], default="validation",
+                         help="'validation' for dev-time checks (beam size, checkpoint picking); "
+                              "'test' ONLY once, for the final reported number -- never to guide choices")
     args = parser.parse_args()
 
     ckpt = args.checkpoint or os.path.join(BASE_DIR, "checkpoints_seq2seq", args.task)
@@ -50,7 +53,7 @@ def main() -> None:
         ds = load_dataset(args.data_dir, args.task)
     else:
         ds = load_from_disk(args.data_dir)
-    pairs = [extract(r) for r in ds["validation"]][: args.n_examples]
+    pairs = [extract(r) for r in ds[args.split]][: args.n_examples]
 
     def decode(ids: list) -> str:
         out = []
@@ -85,7 +88,7 @@ def main() -> None:
             shown += 1
 
     n = len(pairs)
-    print(f"n={n}")
+    print(f"split={args.split} n={n}")
     print(f"CER: {100*total_char_edits/total_ref_chars:.1f}%")
     print(f"WER: {100*total_word_edits/total_ref_words:.1f}%")
     print(f"Exact match: {100*exact/n:.1f}%")
