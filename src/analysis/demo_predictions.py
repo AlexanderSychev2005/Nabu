@@ -59,9 +59,18 @@ from src.data_pipeline.cuneiform_unicode import atf_to_lines, _FACE_KEYS
 # the real transliteration damage markers 'x'/'...' for the two damage
 # sentinels -- instead of raw internal token identities (mBERT's mask token
 # string, mark_damage_signals()'s vocab slot names) that were never meant
-# for a reader of the demo writeup to see. Bolded (markdown **...**) so
-# these three symbols stand out in a long run of transliteration text.
-_PRETTIFY = {"[MASK]": "**?**", UNCLEAR_SIGN_TOKEN: "**x**", UNKNOWN_GAP_TOKEN: "**...**"}
+# for a reader of the demo writeup to see. Bolded with a raw <strong> tag,
+# not markdown **...** -- a masked position is frequently glued directly to
+# the next WordPiece continuation piece with no space (e.g. "**?**b₂"),
+# and CommonMark's flanking-delimiter rule refuses to close ** when it's
+# immediately followed by a non-space, non-punctuation character, silently
+# leaving the raw asterisks in the rendered output. Inline HTML has no such
+# adjacency rule.
+_PRETTIFY = {
+    "[MASK]": "<strong>?</strong>",
+    UNCLEAR_SIGN_TOKEN: "<strong>x</strong>",
+    UNKNOWN_GAP_TOKEN: "<strong>...</strong>",
+}
 
 
 def _prettify_display(decoded: str) -> str:
@@ -516,7 +525,7 @@ def main() -> None:
     out = []
     out.append("# Prediction demo: text-only vs vision (provenience) model\n")
     out.append(f"{selection_note}. Both models see the exact same "
-               f"masked positions per example (bold **?** shown at every chosen position, {args.mlm_probability:.0%} "
+               f"masked positions per example (bold <strong>?</strong> shown at every chosen position, {args.mlm_probability:.0%} "
                "of eligible tokens) -- differences in restoration come only from the two models' separately "
                "trained weights, not from the image itself (the image only reaches `provenience_head`, see module "
                "docstring). The metadata table's `provenience` row is where the image can actually change an answer.\n")
