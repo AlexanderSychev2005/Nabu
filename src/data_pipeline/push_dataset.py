@@ -14,7 +14,6 @@ CONFIG_DIRS = {
     "vision": "hf_dataset_vision",
     "default": "hf_dataset",
     "signs_translit": "hf_dataset_signs_translit",
-    "translit_english": "hf_dataset_translit_english",
 }
 
 
