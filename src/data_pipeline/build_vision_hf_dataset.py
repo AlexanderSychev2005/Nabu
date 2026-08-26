@@ -43,7 +43,17 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 CROPS_DIR = os.path.join(BASE_DIR, "data", "vision_dataset_final")
 BBOX_CSV = os.path.join(CROPS_DIR, "bboxes.csv")
 OUT_DIR = os.path.join(BASE_DIR, "data", "processed", "hf_dataset_vision")
-TEXT_DATASET_DIR = os.path.join(BASE_DIR, "data", "processed", "hf_dataset")
+# The AUTHORITATIVE split -- hf_dataset (the earlier, line-level "default"
+# config) predates add_cdli_bulk_documents.py's showcase-override step, so a
+# handful of tablet_ids (an ORACC edition of a showcase work, same tablet_id
+# as the showcase's own forced-test copy) still carry their pre-override
+# train/validation split there. hf_dataset_documents_with_cdli_bulk is the
+# dataset that step actually writes to, so it's the one with the override
+# already applied -- read the split from here, not from hf_dataset. (Fixing
+# this moves 3 showcase-tablet photos already in hf_dataset_vision from
+# train to test -- rebuilding vision to pick that up is a separate decision,
+# since checkpoints_final_vision was already trained on the old split.)
+TEXT_DATASET_DIR = os.path.join(BASE_DIR, "data", "processed", "hf_dataset_documents_with_cdli_bulk")
 CDLI_CAT_CSV = os.path.join(BASE_DIR, "data", "raw", "cdli_data", "cdli_cat.csv")
 
 
@@ -65,21 +75,16 @@ def load_cdli_cat_meta() -> dict[str, dict]:
 
 def tablet_split_map() -> dict[str, str]:
     """tablet_id -> which split (train/validation/test) it belongs to in
-    the text dataset, so the vision rows can be assigned consistently."""
+    the text dataset, so the vision rows can be assigned consistently.
+    Sourced from hf_dataset_documents_with_cdli_bulk (see TEXT_DATASET_DIR
+    docstring above) -- has a real train/validation/test split for every
+    tablet directly, no separate test.jsonl fallback needed."""
     text_ds = load_from_disk(TEXT_DATASET_DIR)
     mapping = {}
-    for split in ("train", "validation"):
+    for split in ("train", "validation", "test"):
         for tid in set(text_ds[split]["tablet_id"]):
             if tid:
                 mapping[tid] = split
-    # hf_dataset's own DatasetDict never holds a "test" split (prepare_
-    # hf_dataset.py writes it separately to test.jsonl) -- read that too.
-    test_path = os.path.join(BASE_DIR, "data", "processed", "test.jsonl")
-    with open(test_path, encoding="utf-8") as f:
-        for line in f:
-            tid = json.loads(line).get("tablet_id")
-            if tid:
-                mapping[tid] = "test"
     return mapping
 
 
