@@ -138,6 +138,7 @@ code { background: var(--clay); padding: 1px 5px; border-radius: 4px; }
     cursor: pointer;
 }
 .tok-mask.active { outline: 2px solid var(--ink); }
+.tok-special { font-weight: 700; }
 
 .mask-btn {
     font-size: 0.75rem;

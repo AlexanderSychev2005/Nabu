@@ -44,6 +44,11 @@ const PERIOD_ORDER = [
 
 const TASKS = ["period", "genre", "language", "provenience"];
 
+// The three frontend-facing gap symbols -- bolded wherever rendered (token
+// stream, saliency map, best-reading line) so a reader can spot them at a
+// glance instead of hunting for a lone "?"/"x"/"..." in running text.
+const SPECIAL_TOKENS = new Set(["?", "x", "..."]);
+
 $("image-input").addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -135,7 +140,10 @@ function renderRestoration(result) {
     if (!result.restorations.length) { card.classList.add("hidden"); return; }
     card.classList.remove("hidden");
 
-    const reading = result.best_reading.map((t) => (t.startsWith("##") ? t.slice(2) : " " + t)).join("").trim();
+    const reading = result.best_reading.map((t) => {
+        const display = t.startsWith("##") ? t.slice(2) : " " + t;
+        return SPECIAL_TOKENS.has(t) ? ` <strong>${t}</strong>` : display;
+    }).join("").trim();
     $("best-reading").innerHTML = `<span class="section-label" style="margin-bottom:2px;">Most likely reading</span>${reading}`;
 
     renderMaskPicker(result);
@@ -165,7 +173,7 @@ function renderRestorationTokens(result) {
         const span = document.createElement("span");
         const display = tok.startsWith("##") ? tok.slice(2) : " " + tok;
         if (maskPositions.has(i)) {
-            span.className = "tok tok-mask";
+            span.className = "tok tok-mask tok-special";
             if (activePos === i) span.classList.add("active");
             span.textContent = " ?";
             const idx = result.restorations.findIndex((r) => r.position === i);
@@ -173,7 +181,7 @@ function renderRestorationTokens(result) {
                 span.onclick = () => { activeMask = idx; renderMaskPicker(result); renderRestorationTokens(result); renderTopK(result); };
             }
         } else {
-            span.className = "tok";
+            span.className = "tok" + (SPECIAL_TOKENS.has(tok) ? " tok-special" : "");
             span.textContent = display;
             if (saliency && saliency[i] !== undefined) {
                 span.style.backgroundColor = `rgba(178,58,46,${(saliency[i] * 0.7).toFixed(2)})`;
@@ -221,7 +229,7 @@ function renderSaliency(result) {
     container.innerHTML = "";
     result.tokens.forEach((tok, i) => {
         const span = document.createElement("span");
-        span.className = "tok";
+        span.className = "tok" + (SPECIAL_TOKENS.has(tok) ? " tok-special" : "");
         span.textContent = tok.startsWith("##") ? tok.slice(2) : " " + tok;
         if (saliency && saliency[i] !== undefined) {
             span.style.backgroundColor = `rgba(178,58,46,${(saliency[i] * 0.7).toFixed(2)})`;

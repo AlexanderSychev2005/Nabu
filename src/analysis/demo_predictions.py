@@ -4,12 +4,18 @@ vision (provenience) model on the identical input -- complements
 evaluate_mbert.py's aggregate/per-class numbers with concrete examples for
 the diploma writeup.
 
-Masking here always shows [MASK] at every chosen position (not the real
-80/10/10 BERT recipe DataCollatorForLanguageModeling uses during actual
-training/eval) -- clearer to read, and the reported metrics still come from
-evaluate_mbert.py's real collator, not from this file. Both models see the
-exact same masked positions (one shared RNG draw per example) so restoration
-quality is comparable position-by-position, not just in aggregate.
+Masking here always shows a real mask (not the real 80/10/10 BERT recipe
+DataCollatorForLanguageModeling uses during actual training/eval) -- clearer
+to read, and the reported metrics still come from evaluate_mbert.py's real
+collator, not from this file. Both models see the exact same masked
+positions (one shared RNG draw per example) so restoration quality is
+comparable position-by-position, not just in aggregate.
+
+Display only, matching the web tool's own notation (see app.py): a masked
+position renders as bold '?', the corpus's own damage markers render as
+bold 'x' (single unclear sign) / '...' (unknown-length lacuna) instead of
+mBERT's internal token identities ([MASK], the two [unusedN] damage
+sentinels) -- see _prettify_display() below.
 
 The image only ever reaches provenience_head (see MBertMultiTask.forward --
 mlm_logits is computed straight from BERT's own hidden states, before any
@@ -46,21 +52,22 @@ from src.training.train_mbert import (
     MBertMultiTask, mark_damage_signals, build_tablet_image_index_from_hf, IMG_TRANSFORM_EVAL,
     UNCLEAR_SIGN_TOKEN, UNKNOWN_GAP_TOKEN,
 )
+from src.data_pipeline.review_bboxes_gui import build_path_index
+from src.data_pipeline.cuneiform_unicode import atf_to_lines, _FACE_KEYS
 
-# Show the real transliteration damage notation the corpus itself uses
-# (single unclear sign 'x', unknown-length lacuna '...') instead of the raw
-# mBERT vocab slot names mark_damage_signals() maps them onto for training --
-# those are internal token identities, not something a reader of the demo
-# writeup should see.
-_PRETTIFY = {UNCLEAR_SIGN_TOKEN: "x", UNKNOWN_GAP_TOKEN: "..."}
+# Show the frontend's own notation -- '?' for a masked/restored position,
+# the real transliteration damage markers 'x'/'...' for the two damage
+# sentinels -- instead of raw internal token identities (mBERT's mask token
+# string, mark_damage_signals()'s vocab slot names) that were never meant
+# for a reader of the demo writeup to see. Bolded (markdown **...**) so
+# these three symbols stand out in a long run of transliteration text.
+_PRETTIFY = {"[MASK]": "**?**", UNCLEAR_SIGN_TOKEN: "**x**", UNKNOWN_GAP_TOKEN: "**...**"}
 
 
 def _prettify_display(decoded: str) -> str:
     for raw, clean in _PRETTIFY.items():
         decoded = decoded.replace(raw, clean)
     return decoded
-from src.data_pipeline.review_bboxes_gui import build_path_index
-from src.data_pipeline.cuneiform_unicode import atf_to_lines, _FACE_KEYS
 
 TASKS = ["period", "genre", "language", "provenience"]
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -509,7 +516,7 @@ def main() -> None:
     out = []
     out.append("# Prediction demo: text-only vs vision (provenience) model\n")
     out.append(f"{selection_note}. Both models see the exact same "
-               f"masked positions per example (`[MASK]` shown at every chosen position, {args.mlm_probability:.0%} "
+               f"masked positions per example (bold **?** shown at every chosen position, {args.mlm_probability:.0%} "
                "of eligible tokens) -- differences in restoration come only from the two models' separately "
                "trained weights, not from the image itself (the image only reaches `provenience_head`, see module "
                "docstring). The metadata table's `provenience` row is where the image can actually change an answer.\n")
