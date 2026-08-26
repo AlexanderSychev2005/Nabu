@@ -9,13 +9,13 @@
 <table><tr><td valign="top" width="240"><img src="demo_images/P273207.jpg" width="220"><br><sub>model input (224x224)</sub><br><br><img src="demo_images/P273207_full.jpg" width="220"><br><sub>full photo (reference)</sub></td><td valign="top"><table><tr><th>#</th><th>face</th><th>cuneiform</th><th>transliteration</th><th>translation</th></tr><tr><td>1'</td><td>default</td><td>x</td><td>... x</td><td>&mdash;</td></tr><tr><td>2'</td><td>default</td><td>x x 𒉿</td><td>x x pi ...</td><td>&mdash;</td></tr><tr><td>3'</td><td>default</td><td>𒂊 𒌨 𒄷 x</td><td>e taš-hu x ...</td><td>&mdash;</td></tr><tr><td>4'</td><td>default</td><td>𒅎 𒈥 x</td><td>im-mar x ...</td><td>&mdash;</td></tr><tr><td>5'</td><td>default</td><td>𒅁 𒁍 𒌋 x</td><td>ib-bu-u x ...</td><td>&mdash;</td></tr><tr><td>6'</td><td>default</td><td>𒅁 𒅆 𒋗</td><td>ib-ši šu ...</td><td>&mdash;</td></tr><tr><td>7'</td><td>default</td><td>𒄿 𒅘 𒄫 x</td><td>i-nak-kir x ...</td><td>&mdash;</td></tr><tr><td>8'</td><td>default</td><td>x x x</td><td>x x x ...</td><td>&mdash;</td></tr></table></td></tr></table>
 
 **Original text (transliteration):**
-> [unused1] [unused1] pi [unused2] e taš - hu [unused1] [unused2] im - mar [unused1] [unused2] ib - bu - u [unused1] [unused2] ib - ši šu [unused2] i - nak - kir [unused1] [unused2]
+> x x pi ... e taš - hu x ... im - mar x ... ib - bu - u x ... ib - ši šu ... i - nak - kir x ...
 
 **Cuneiform (Unicode signs, whole document, not position-aligned to the text above):**
 > x x 𒉿 𒂊 𒌨 𒄷 x 𒅎 𒈥 x 𒅁 𒁍 𒌋 x 𒅁 𒅆 𒋗 𒄿 𒅘 𒄫 x
 
 **Masked input (4 positions):**
-> [unused1] [unused1] [MASK] [unused2] e ta [MASK] - hu [unused1] [unused2] im - mar [unused1] [unused2] ib - bu - u [unused1] [unused2] ib - ši šu [unused2] i - [MASK] - ki [MASK] [unused1] [unused2]
+> x x [MASK] ... e ta [MASK] - hu x ... im - mar x ... ib - bu - u x ... ib - ši šu ... i - [MASK] - ki [MASK] x ...
 
 ### Restoration (masked-token predictions)
 
@@ -46,13 +46,13 @@ Top-1 accuracy on this example: text-only 0/4 (0%), vision 0/4 (0%)
 <table><tr><td valign="top" width="240"><img src="demo_images/P285823.jpg" width="220"><br><sub>model input (224x224)</sub><br><br><img src="demo_images/P285823_full.jpg" width="220"><br><sub>full photo (reference)</sub></td><td valign="top"><table><tr><th>#</th><th>face</th><th>cuneiform</th><th>transliteration</th><th>translation</th></tr><tr><td>1'</td><td>default</td><td>x 𒇻 𒌋 x</td><td>x x x x lu-u x x x x x (x x)</td><td>&mdash;</td></tr><tr><td>2'</td><td>default</td><td>x 𒆠 𒈠 𒄒 𒉺 x</td><td>x x x x ki-ma kip-pa-ti₃ x x x (x x)</td><td>&mdash;</td></tr><tr><td>3'</td><td>default</td><td>𒌋 𒁕 𒀭 𒂊 𒇺 𒌋 š</td><td>ku-up-ru lu da-an e-liš u šap-liš</td><td>&mdash;</td></tr><tr><td>4'</td><td>default</td><td>𒂊 𒉿 𒄭 𒄑</td><td>x (x) x-e pe-hi MA₂</td><td>&mdash;</td></tr><tr><td>5'</td><td>default</td><td>𒀀 𒄨 𒈾 𒃻 𒀀 𒉺𒅁 𒉺 𒊩</td><td>u₂-ṣur a-dan-na ša₂ a-šap-pa-rak-ka</td><td>&mdash;</td></tr><tr><td>6'</td><td>default</td><td>𒂊 𒊒 𒌝 𒈠 𒄑 𒌁</td><td>MA₂ e-ru-um-ma KA₂ MA₂ tir-ra</td><td>&mdash;</td></tr><tr><td>7'</td><td>default</td><td>𒁉 𒃻 𒅗 𒅗 𒌋</td><td>zi-ib-la ina lib₃-bi-ša₂ ŠE.BAR-ka NIG₂.ŠU-ka u NIG₂.GA-ka</td><td>&mdash;</td></tr><tr><td>8'</td><td>default</td><td>𒀀 𒆠 𒆳 𒅗 𒊓 𒆳 𒅗 𒌋 𒌉 𒈨𒌍 𒌝 𒁹</td><td>aš₂-šat-ka ki-mat-ka sa-lat-ka u DUMU-MEŠ um-ma-ni</td><td>&mdash;</td></tr><tr><td>9'</td><td>default</td><td>𒁷 𒌑 𒈠 𒄠 𒂔 𒈠 𒆷 𒈨 𒅕</td><td>bu-ul EDIN u₂-ma-am EDIN ma-la U₂.ŠIM me-er-ʾi-sun</td><td>&mdash;</td></tr><tr><td>10'</td><td>default</td><td>𒀀 𒊩 𒈠 𒄿 𒈾 𒊍 𒍝 𒊒</td><td>a-šap-pa-rak-kum₂-ma i-na-aṣ-ṣa-ru KA₂-ka</td><td>&mdash;</td></tr><tr><td>11'</td><td>default</td><td>𒀀 𒄩 𒋀 𒉺 𒀀 𒋙 𒈠</td><td>at-ra-ha-sis pa-a-šu₂ DU₃-ma DUG₄.GA</td><td>&mdash;</td></tr><tr><td>12'</td><td>default</td><td>𒋼𒀀 𒁹 𒂍 𒀀 𒁁 𒉌</td><td>i-zak-kar ana e₂-a be-li₂-šu₂</td><td>&mdash;</td></tr><tr><td>13'</td><td>default</td><td>𒄿 𒈠 𒀀 𒄑 𒌌 𒂊 𒁍 𒍑 x</td><td>ma-ti-ma-a MA₂ ul e-pu-uš x x</td><td>&mdash;</td></tr><tr><td>14'</td><td>default</td><td>𒀀 𒊑 𒂊 𒈲 𒌑 ṣ</td><td>ina qaq-qa-ri e-ṣir u₂-ṣur-tu₂</td><td>&mdash;</td></tr><tr><td>15'</td><td>default</td><td>𒌅 𒇻 𒄯 𒈠 𒄑</td><td>u₂-ṣur-tu lu-mur-ma MA₂ lu-pu-uš</td><td>&mdash;</td></tr><tr><td>16'</td><td>default</td><td>𒀀 𒀸 𒆕 𒋡 𒊑 𒂊</td><td>e₂-a ina qaq-qa-ri e-ṣir u₂-ṣur-tu</td><td>&mdash;</td></tr><tr><td>17'</td><td>default</td><td>𒂊 𒉌 𒃻 𒋳 𒁀 𒀀</td><td>x x (x) be-li₂ ša₂ taq-ba-a x x x (x x x)</td><td>&mdash;</td></tr></table></td></tr></table>
 
 **Original text (transliteration):**
-> [unused1] [unused1] [unused1] [unused1] lu - u [unused1] [unused1] [unused1] [unused1] [unused1] [unused1] [unused1] [unused1] [unused1] [unused1] [unused1] ki - ma kip - pa - ti₃ [unused1] [unused1] [unused1] [unused1] [unused1] ku - up - ru lu da - an e - liš u šap - liš [unused1] [unused1] [unused1] - e pe - hi MA₂ u₂ - ṣur a - dan - na ša₂ a - šap - pa - rak - ka MA₂ e - ru - um - ma KA₂ MA₂ tir - ra zi - ib - la ina lib₃ - bi - ša₂ ŠE. BAR - ka NIG₂. ŠU - ka u NIG₂. GA - ka aš₂ - šat - ka ki - mat - ka sa - lat - ka u DUMU - MEŠ um - ma - ni bu - ul EDIN u₂ - ma - am EDIN ma - la U₂. ŠIM me - er - ʾi - sun a - šap - pa - rak - kum₂ - ma i - na - aṣ - ṣa - ru KA₂ - ka at - ra - ha - sis pa - a - šu₂ DU₃ - ma DUG₄. GA i - zak - kar ana e₂ - a be - li₂ - šu₂ ma - ti - ma - a MA₂ ul e - pu - uš [unused1] [unused1] ina qaq - qa - ri e - ṣir u₂ - ṣur - tu₂ u₂ - ṣur - tu lu - mur - ma MA₂ lu - pu - uš e₂ - a ina qaq - qa - ri e - ṣir u₂ - ṣur - tu [unused1] [unused1] [unused1] be - li₂ ša₂ taq - ba - a [unused1] [unused1] [unused1] [unused1] [unused1] [unused1]
+> x x x x lu - u x x x x x x x x x x x ki - ma kip - pa - ti₃ x x x x x ku - up - ru lu da - an e - liš u šap - liš x x x - e pe - hi MA₂ u₂ - ṣur a - dan - na ša₂ a - šap - pa - rak - ka MA₂ e - ru - um - ma KA₂ MA₂ tir - ra zi - ib - la ina lib₃ - bi - ša₂ ŠE. BAR - ka NIG₂. ŠU - ka u NIG₂. GA - ka aš₂ - šat - ka ki - mat - ka sa - lat - ka u DUMU - MEŠ um - ma - ni bu - ul EDIN u₂ - ma - am EDIN ma - la U₂. ŠIM me - er - ʾi - sun a - šap - pa - rak - kum₂ - ma i - na - aṣ - ṣa - ru KA₂ - ka at - ra - ha - sis pa - a - šu₂ DU₃ - ma DUG₄. GA i - zak - kar ana e₂ - a be - li₂ - šu₂ ma - ti - ma - a MA₂ ul e - pu - uš x x ina qaq - qa - ri e - ṣir u₂ - ṣur - tu₂ u₂ - ṣur - tu lu - mur - ma MA₂ lu - pu - uš e₂ - a ina qaq - qa - ri e - ṣir u₂ - ṣur - tu x x x be - li₂ ša₂ taq - ba - a x x x x x x
 
 **Cuneiform (Unicode signs, whole document, not position-aligned to the text above):**
 > x 𒇻 𒌋 x x 𒆠 𒈠 𒄒 𒉺 x 𒌋 𒁕 𒀭 𒂊 𒇺 𒌋 š 𒂊 𒉿 𒄭 𒄑 𒀀 𒄨 𒈾 𒃻 𒀀 𒉺𒅁 𒉺 𒊩 𒂊 𒊒 𒌝 𒈠 𒄑 𒌁 𒁉 𒃻 𒅗 𒅗 𒌋 𒀀 𒆠 𒆳 𒅗 𒊓 𒆳 𒅗 𒌋 𒌉 𒈨𒌍 𒌝 𒁹 𒁷 𒌑 𒈠 𒄠 𒂔 𒈠 𒆷 𒈨 𒅕 𒀀 𒊩 𒈠 𒄿 𒈾 𒊍 𒍝 𒊒 𒀀 𒄩 𒋀 𒉺 𒀀 𒋙 𒈠 𒋼𒀀 𒁹 𒂍 𒀀 𒁁 𒉌 𒄿 𒈠 𒀀 𒄑 𒌌 𒂊 𒁍 𒍑 x 𒀀 𒊑 𒂊 𒈲 𒌑 ṣ 𒌅 𒇻 𒄯 𒈠 𒄑 𒀀 𒀸 𒆕 𒋡 𒊑 𒂊 𒂊 𒉌 𒃻 𒋳 𒁀 𒀀
 
 **Masked input (48 positions):**
-> [unused1] [unused1] [unused1] [unused1] lu - u [unused1] [unused1] [unused1] [unused1] [unused1] [unused1] [unused1] [unused1] [unused1] [unused1] [unused1] [MASK] - ma kip - pa - ti₃ [unused1] [unused1] [unused1] [unused1] [unused1] [MASK] - [MASK] [MASK] ru lu da - an [MASK] - liš u šap - liš [unused1] [unused1] [unused1] - e pe - hi MA₂ u [MASK] - ṣur [MASK] - dan [MASK] na [MASK]₂ a [MASK] šap - pa - rak - ka MA₂ [MASK] - ru - um - ma KA [MASK] MA₂ tir - ra zi - [MASK] - [MASK] ina lib₃ - bi - ša₂ ŠE. BAR - ka NIG₂. [MASK] - ka u NIG₂. GA [MASK] [MASK] [MASK]₂ [MASK] šat - ka [MASK] - mat - ka sa [MASK] lat - ka u DUMU - MEŠ um - [MASK] - ni bu - [MASK] ED [MASK] u₂ - ma - am ED [MASK] ma - la U₂. ŠIM me - er - ʾi - sun a - šap - [MASK] - [MASK] - [MASK]m₂ - ma i - [MASK] - [MASK]ṣ - ṣa - ru KA₂ [MASK] [MASK] at - ra - ha - sis pa - a - šu₂ DU₃ - ma DUG [MASK]. [MASK] i - zak - kar ana e₂ - a be [MASK] li₂ - šu₂ [MASK] - ti - ma - a MA₂ ul e - pu - uš [unused1] [unused1] ina qaq - qa - ri e [MASK] ṣir u₂ - ṣur - tu₂ u₂ - ṣur [MASK] tu lu - mur [MASK] ma MA [MASK] lu - pu - [MASK] e₂ - a ina qaq [MASK] qa - ri e - [MASK] [MASK] u₂ - ṣur [MASK] [MASK] [unused1] [unused1] [unused1] be - li₂ ša₂ [MASK]q - ba - [MASK] [unused1] [unused1] [unused1] [unused1] [unused1] [unused1]
+> x x x x lu - u x x x x x x x x x x x [MASK] - ma kip - pa - ti₃ x x x x x [MASK] - [MASK] [MASK] ru lu da - an [MASK] - liš u šap - liš x x x - e pe - hi MA₂ u [MASK] - ṣur [MASK] - dan [MASK] na [MASK]₂ a [MASK] šap - pa - rak - ka MA₂ [MASK] - ru - um - ma KA [MASK] MA₂ tir - ra zi - [MASK] - [MASK] ina lib₃ - bi - ša₂ ŠE. BAR - ka NIG₂. [MASK] - ka u NIG₂. GA [MASK] [MASK] [MASK]₂ [MASK] šat - ka [MASK] - mat - ka sa [MASK] lat - ka u DUMU - MEŠ um - [MASK] - ni bu - [MASK] ED [MASK] u₂ - ma - am ED [MASK] ma - la U₂. ŠIM me - er - ʾi - sun a - šap - [MASK] - [MASK] - [MASK]m₂ - ma i - [MASK] - [MASK]ṣ - ṣa - ru KA₂ [MASK] [MASK] at - ra - ha - sis pa - a - šu₂ DU₃ - ma DUG [MASK]. [MASK] i - zak - kar ana e₂ - a be [MASK] li₂ - šu₂ [MASK] - ti - ma - a MA₂ ul e - pu - uš x x ina qaq - qa - ri e [MASK] ṣir u₂ - ṣur - tu₂ u₂ - ṣur [MASK] tu lu - mur [MASK] ma MA [MASK] lu - pu - [MASK] e₂ - a ina qaq [MASK] qa - ri e - [MASK] [MASK] u₂ - ṣur [MASK] [MASK] x x x be - li₂ ša₂ [MASK]q - ba - [MASK] x x x x x x
 
 ### Restoration (masked-token predictions)
 
@@ -127,13 +127,13 @@ Top-1 accuracy on this example: text-only 29/48 (60%), vision 27/48 (56%)
 <table><tr><td valign="top" width="240"><img src="demo_images/P273223.jpg" width="220"><br><sub>model input (224x224)</sub><br><br><img src="demo_images/P273223_full.jpg" width="220"><br><sub>full photo (reference)</sub></td><td valign="top"><table><tr><th>#</th><th>face</th><th>cuneiform</th><th>transliteration</th><th>translation</th></tr><tr><td>1'</td><td>default</td><td>x x x</td><td>... x x x ...</td><td>&mdash;</td></tr><tr><td>2'</td><td>default</td><td>𒄿 𒉺 𒀾 š</td><td>man-za-zu i-pa-<<da>>-aš₂-šum-ma is-sah-ra</td><td>&mdash;</td></tr><tr><td>3'</td><td>default</td><td>𒅎 𒄷 𒌑 𒈦 š</td><td>il-lik SIM u₂-maš-šar : ...</td><td>&mdash;</td></tr><tr><td>4'</td><td>default</td><td>𒌋</td><td>man-za-zu ul ip-pa-aš₂-šum-ma is-sah-ra</td><td>&mdash;</td></tr><tr><td>5'</td><td>default</td><td>𒊑 𒁀 𒌑</td><td>u₂-še-ṣi-ma a-ri-ba u₂-maš-šar : ...</td><td>&mdash;</td></tr><tr><td>6'</td><td>default</td><td>𒅈 𒊑 𒌌</td><td>ik-kal i-ša₂-ah-hi i-tar-ri ul is-sah-ra</td><td>&mdash;</td></tr></table></td></tr></table>
 
 **Original text (transliteration):**
-> man - za - zu i - pa - aš₂ - šum - ma is - sah - ra il - lik SIM u₂ - maš - šar : [unused2] u₂ - še - ṣi - ma a - ri - ba u₂ - maš - šar : [unused2] ik - kal i - ša₂ - ah - hi i - tar - ri ul is - sah - ra
+> man - za - zu i - pa - aš₂ - šum - ma is - sah - ra il - lik SIM u₂ - maš - šar : ... u₂ - še - ṣi - ma a - ri - ba u₂ - maš - šar : ... ik - kal i - ša₂ - ah - hi i - tar - ri ul is - sah - ra
 
 **Cuneiform (Unicode signs, whole document, not position-aligned to the text above):**
 > 𒄿 𒉺 𒀾 š 𒅎 𒄷 𒌑 𒈦 š 𒊑 𒁀 𒌑 𒅈 𒊑 𒌌
 
 **Masked input (11 positions):**
-> man - za - zu [MASK] - pa [MASK] aš [MASK] - [MASK] - ma is - sah - ra il - lik SI [MASK] u₂ - maš [MASK] šar : [unused2] u₂ - [MASK] - [MASK] - ma a - ri - ba u₂ - [MASK] - šar : [unused2] ik - kal i - [MASK]₂ - ah - hi i - tar - ri ul is [MASK] sah - ra
+> man - za - zu [MASK] - pa [MASK] aš [MASK] - [MASK] - ma is - sah - ra il - lik SI [MASK] u₂ - maš [MASK] šar : ... u₂ - [MASK] - [MASK] - ma a - ri - ba u₂ - [MASK] - šar : ... ik - kal i - [MASK]₂ - ah - hi i - tar - ri ul is [MASK] sah - ra
 
 ### Restoration (masked-token predictions)
 
@@ -171,13 +171,13 @@ Top-1 accuracy on this example: text-only 7/11 (64%), vision 7/11 (64%)
 <table><tr><td valign="top" width="240"><img src="demo_images/P402919.jpg" width="220"><br><sub>model input (224x224)</sub><br><br><img src="demo_images/P402919_full.jpg" width="220"><br><sub>full photo (reference)</sub></td><td valign="top"><table><tr><th>#</th><th>face</th><th>cuneiform</th><th>transliteration</th><th>translation</th></tr><tr><td>1'</td><td>default</td><td>𒀯 𒇸</td><td>mul-lil AN-e u KI-ti₃ ...</td><td>&mdash;</td></tr><tr><td>2'</td><td>default</td><td>𒀀 𒈾 𒁺 𒌦</td><td>ša₂ a-na du-un-ni ...</td><td>&mdash;</td></tr><tr><td>3'</td><td>default</td><td>𒁀 𒉡</td><td>GIŠ.NUMUN.AB₂ ba-nu-u₂ ...</td><td>&mdash;</td></tr><tr><td>4'</td><td>default</td><td>𒂍 𒀭 𒈨𒌍 𒃻</td><td>a-bit DINGIR-MEŠ ša₂ ...</td><td>&mdash;</td></tr><tr><td>5'</td><td>default</td><td>𒈗</td><td>LUGAL.AB₂.DUBUR₂ LUGAL ...</td><td>&mdash;</td></tr></table></td></tr></table>
 
 **Original text (transliteration):**
-> mul - lil AN - e u KI - ti₃ [unused2] ša₂ a - na du - un - ni [unused2] a - bit DINGIR - MEŠ ša₂ [unused2]
+> mul - lil AN - e u KI - ti₃ ... ša₂ a - na du - un - ni ... a - bit DINGIR - MEŠ ša₂ ...
 
 **Cuneiform (Unicode signs, whole document, not position-aligned to the text above):**
 > 𒀯 𒇸 𒀀 𒈾 𒁺 𒌦 𒂍 𒀭 𒈨𒌍 𒃻
 
 **Masked input (5 positions):**
-> mul - lil [MASK] [MASK] e u KI - [MASK]₃ [unused2] ša₂ a - na du - [MASK] - ni [unused2] a - bit [MASK] - MEŠ ša₂ [unused2]
+> mul - lil [MASK] [MASK] e u KI - [MASK]₃ ... ša₂ a - na du - [MASK] - ni ... a - bit [MASK] - MEŠ ša₂ ...
 
 ### Restoration (masked-token predictions)
 
@@ -207,13 +207,13 @@ Top-1 accuracy on this example: text-only 2/5 (40%), vision 2/5 (40%)
 *Atrahasis fragment -- Atraḫasīs (Story of the Flood) -- Neo-Babylonian -- The British Museum*
 
 **Original text (transliteration):**
-> [unused2] [unused1] TUKUL i - [unused2] [unused2] [unused1] ina GU. ZA [unused1] [unused2] [unused2] + en - lil₂ KA - šu₂ DU₃ - ma [unused2] [unused2] zag - ga - [unused1] [unused1] [unused2]
+> ... x TUKUL i - ... ... x ina GU. ZA x ... ... + en - lil₂ KA - šu₂ DU₃ - ma ... ... zag - ga - x x ...
 
 **Cuneiform (Unicode signs, whole document, not position-aligned to the text above):**
 > x 𒄑 𒆪 𒄿 x 𒀸 𒄑 x 𒅍 𒅗 𒋙 𒀭 𒍠 𒂵 x
 
 **Masked input (4 positions):**
-> [unused2] [unused1] TUKUL i - [unused2] [unused2] [unused1] ina GU. [MASK]A [unused1] [unused2] [unused2] + en - lil₂ KA - šu₂ [MASK] [MASK] [MASK] ma [unused2] [unused2] zag - ga - [unused1] [unused1] [unused2]
+> ... x TUKUL i - ... ... x ina GU. [MASK]A x ... ... + en - lil₂ KA - šu₂ [MASK] [MASK] [MASK] ma ... ... zag - ga - x x ...
 
 ### Restoration (masked-token predictions)
 
@@ -244,13 +244,13 @@ Top-1 accuracy on this example: text-only 2/4 (50%), vision 2/4 (50%)
 <table><tr><td valign="top" width="240"><img src="demo_images/P404643.jpg" width="220"><br><sub>model input (224x224)</sub><br><br><img src="demo_images/P404643_full.jpg" width="220"><br><sub>full photo (reference)</sub></td><td valign="top"><table><tr><th>#</th><th>face</th><th>cuneiform</th><th>transliteration</th><th>translation</th></tr><tr><td>1'</td><td>reverse</td><td>𒍪 𒊻</td><td>i-zu-uz-zu</td><td>&mdash;</td></tr><tr><td>2'</td><td>reverse</td><td>𒀀</td><td>i-na NIG₂.GA E₂ A.BA</td><td>&mdash;</td></tr><tr><td>3'</td><td>reverse</td><td>x 𒈬</td><td>... x mu ...</td><td>&mdash;</td></tr><tr><td>4'</td><td>reverse</td><td>𒂊 𒄴</td><td>ṣe-eh-ri-im</td><td>&mdash;</td></tr><tr><td>5'</td><td>reverse</td><td>š 𒊭 𒌈 𒆷 𒀀</td><td>ša aš-ša-tum la ah-zu</td><td>&mdash;</td></tr><tr><td>6'</td><td>reverse</td><td>𒇷 𒀜</td><td>e-li-at ši₂-ti-šu</td><td>&mdash;</td></tr><tr><td>7'</td><td>reverse</td><td>x x x x</td><td>... x x x x ...</td><td>&mdash;</td></tr></table></td></tr></table>
 
 **Original text (transliteration):**
-> i - zu - uz - zu [unused2] [unused1] mu [unused2] ṣe - eh - ri - im ša aš - ša - tum la ah - zu e - li - at ši₂ - ti - šu
+> i - zu - uz - zu ... x mu ... ṣe - eh - ri - im ša aš - ša - tum la ah - zu e - li - at ši₂ - ti - šu
 
 **Cuneiform (Unicode signs, whole document, not position-aligned to the text above):**
 > 𒍪 𒊻 x 𒈬 𒂊 𒄴 š 𒊭 𒌈 𒆷 𒀀 𒇷 𒀜
 
 **Masked input (6 positions):**
-> i - zu - [MASK] - zu [unused2] [unused1] mu [unused2] ṣe [MASK] eh - ri [MASK] im ša aš - ša - tum la ah - zu e - [MASK] - at ši₂ [MASK] ti [MASK] šu
+> i - zu - [MASK] - zu ... x mu ... ṣe [MASK] eh - ri [MASK] im ša aš - ša - tum la ah - zu e - [MASK] - at ši₂ [MASK] ti [MASK] šu
 
 ### Restoration (masked-token predictions)
 

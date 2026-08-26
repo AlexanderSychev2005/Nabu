@@ -61,14 +61,6 @@ $("image-input").addEventListener("change", async (e) => {
     $("image-preview-wrap").classList.remove("hidden");
 });
 
-$("insert-mask-btn").addEventListener("click", () => {
-    const ta = $("input-text");
-    const start = ta.selectionStart, end = ta.selectionEnd;
-    ta.value = ta.value.slice(0, start) + "[MASK]" + ta.value.slice(end);
-    ta.focus();
-    ta.selectionStart = ta.selectionEnd = start + "[MASK]".length;
-});
-
 $("temp-slider").addEventListener("input", (e) => { $("temp-value").textContent = parseFloat(e.target.value).toFixed(1); });
 
 for (const btn of [$("mode-restore"), $("mode-attribute")]) {
@@ -119,7 +111,7 @@ function render(result) {
     const warn = $("truncation-warning");
     if (result.truncated) {
         warn.textContent = `Input truncated to ${result.max_length} tokens (had ${result.full_length}) -- ` +
-            `anything past that point, including any [MASK] you placed there, was dropped before the model saw it.`;
+            `anything past that point, including any ? you placed there, was dropped before the model saw it.`;
         warn.classList.remove("hidden");
     } else {
         warn.classList.add("hidden");
@@ -175,7 +167,7 @@ function renderRestorationTokens(result) {
         if (maskPositions.has(i)) {
             span.className = "tok tok-mask";
             if (activePos === i) span.classList.add("active");
-            span.textContent = " [MASK]";
+            span.textContent = " ?";
             const idx = result.restorations.findIndex((r) => r.position === i);
             if (idx >= 0) {
                 span.onclick = () => { activeMask = idx; renderMaskPicker(result); renderRestorationTokens(result); renderTopK(result); };

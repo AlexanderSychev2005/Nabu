@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nabu | Akkadian NLP Tool</title>
-    <link rel="stylesheet" href="/static/style.css?v=2">
+    <link rel="stylesheet" href="/static/style.css?v=3">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -31,20 +31,19 @@
                 <span class="section-label">How to use</span>
                 <ul class="instructions-list">
                     <li>Type or paste a transliteration below, including spaces.</li>
-                    <li>Click <button type="button" class="icon-btn" id="insert-mask-btn" title="Insert [MASK] at the cursor">[MASK]</button>
-                        to mark a position you want restored, or click anywhere in the text box and press it again for another one.
-                        Leave none and a random 15% of positions get auto-masked instead.</li>
+                    <li>Type <code>?</code> wherever you want the model's guess. Leave none and a random 15% of
+                        positions get auto-masked instead.</li>
                     <li>Use <code>x</code> for a single sign of unclear reading and <code>...</code> for a gap of unknown
-                        length -- both are read as context only. Our model predicts one sub-word token at a time, so
-                        unlike Aeneas's own arbitrary-length restoration, an unknown-length gap is not itself restored,
-                        only marked.</li>
+                        length -- both are read as context only, not restored. Our model predicts one sub-word token
+                        at a time, so unlike Aeneas's own arbitrary-length restoration, an unknown-length gap can't
+                        itself be filled in, only marked.</li>
                     <li>A tablet photo is optional and only ever affects the provenience head.</li>
                 </ul>
             </div>
 
             <div class="mb-4">
                 <span class="section-label">Transliteration</span>
-                <textarea id="input-text" rows="6" placeholder="um-ma i-din-{d}suen-ma x-bi2-ma ... a-na zi-nu-u2"></textarea>
+                <textarea id="input-text" rows="6" placeholder="um-ma i-din-{d}suen-ma ?-bi2-ma ... a-na zi-nu-u2"></textarea>
             </div>
 
             <div class="mb-4">
@@ -145,6 +144,6 @@
         </div>
     </div>
 
-    <script src="/static/script.js?v=2"></script>
+    <script src="/static/script.js?v=3"></script>
 </body>
 </html>

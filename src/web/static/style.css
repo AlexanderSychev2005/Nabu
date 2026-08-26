@@ -196,19 +196,6 @@ code { background: var(--clay); padding: 1px 5px; border-radius: 4px; }
 .instructions-list li { margin-bottom: 6px; }
 .instructions-list li:last-child { margin-bottom: 0; }
 
-.icon-btn {
-    font-family: monospace;
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 1px 6px;
-    border: 1px solid var(--seal);
-    background: white;
-    color: var(--seal);
-    border-radius: 4px;
-    cursor: pointer;
-}
-.icon-btn:hover { background: var(--seal); color: white; }
-
 .temp-row { display: flex; align-items: baseline; justify-content: space-between; }
 #temp-value { font-family: monospace; font-weight: 600; color: var(--seal); font-size: 0.85rem; }
 input[type="range"] { width: 100%; accent-color: var(--seal); }

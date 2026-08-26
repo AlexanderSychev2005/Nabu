@@ -22,6 +22,7 @@ import io
 import json
 import os
 import random
+import re
 import sys
 from pathlib import Path
 from typing import Optional
@@ -38,9 +39,24 @@ from safetensors.torch import load_file
 from transformers import AutoTokenizer
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from src.training.train_mbert import MBertMultiTask, mark_damage_signals, IMG_TRANSFORM_EVAL
+from src.training.train_mbert import (
+    MBertMultiTask, mark_damage_signals, IMG_TRANSFORM_EVAL,
+    UNCLEAR_SIGN_TOKEN, UNKNOWN_GAP_TOKEN,
+)
 from src.data_pipeline.prepare_hf_dataset import clean_transliteration
 from src.analysis.interpret import text_gradient_saliency, image_gradcam, document_embedding, nearest_documents
+
+# The restoration-request marker: a standalone "?", not glued onto a sign
+# the way ATF's own uncertainty flag is (e.g. "lu-u?") -- that glued form is
+# already stripped as noise by clean_transliteration/cuneiform_unicode.py,
+# so an isolated "?" never collides with real corpus content. Deliberately a
+# third symbol, not "x"/"..." -- those already mean something else (a KNOWN
+# damage type, excluded from prediction, see mark_damage_signals) and reusing
+# them for "please predict this" would conflate two different signals.
+# Mirrors Aeneas's own convention (Assael et al. 2025): '-' for a known
+# single-character gap, '#' for one of unknown length, and a separate '?'
+# marking exactly the positions fed to the restoration head for prediction.
+QUESTION_MARK_RE = re.compile(r"(?<!\S)\?(?!\S)")
 
 BASE_DIR = Path(__file__).parent.parent.parent
 CHECKPOINT = BASE_DIR / "checkpoints_final_vision" / "final_model"
@@ -120,6 +136,18 @@ def index() -> FileResponse:
     return FileResponse(Path(__file__).parent / "static" / "index.html")
 
 
+def _prettify(tok: str) -> str:
+    """Show the frontend's own notation -- '?' for a mask request, the real
+    transliteration damage markers 'x'/'...' for the two damage sentinels --
+    instead of raw internal token identities (mBERT's mask token string,
+    mark_damage_signals()'s vocab slot names) that were never meant for a
+    user to see rendered back at them. Every view that turns token ids into
+    display text goes through this, so a mask position reads '?' everywhere
+    (restoration panel, saliency map, best-reading line), not just the one
+    view that special-cases it."""
+    return {tokenizer.mask_token: "?", UNCLEAR_SIGN_TOKEN: "x", UNKNOWN_GAP_TOKEN: "..."}.get(tok, tok)
+
+
 def _predict_head(out: dict, task: str) -> dict:
     probs = torch.softmax(out[f"{task}_logits"][0], dim=-1).detach()
     conf, idx = probs.max(dim=-1)
@@ -134,25 +162,24 @@ def _predict_head(out: dict, task: str) -> dict:
 @app.post("/api/analyze")
 def analyze(req: AnalyzeRequest) -> dict:
     rng = random.Random(req.seed)
-    # clean_transliteration strips [](){}<>| (editorial brackets, ATF sign
-    # separators) from the whole string -- protect a literal "[MASK]" (a
-    # user can type this directly to pick an exact restoration position)
-    # before that runs, or its own brackets get stripped and it silently
-    # degrades to a normal "MASK" word instead of the tokenizer's real
-    # mask token.
-    placeholder = "AKKMASKPLACEHOLDER"
-    text = req.text.replace("[MASK]", placeholder)
-    text = clean_transliteration(text)
-    text = text.replace(placeholder, "[MASK]")
+    text = clean_transliteration(req.text)
+    # A user types a standalone "?" wherever they want the model's guess
+    # (see QUESTION_MARK_RE above for why this symbol and not "x"/"...").
+    # No placeholder-protection dance needed the way a literal "[MASK]"
+    # would have required: clean_transliteration doesn't touch "?" at all.
+    # Must run before mark_damage_signals(), though it never would have
+    # collided with that function's own patterns anyway -- "?" isn't "x"
+    # or "...".
+    text = QUESTION_MARK_RE.sub(tokenizer.mask_token, text)
     marked = mark_damage_signals(text)
     full_length = len(tokenizer(marked)["input_ids"])
     enc = tokenizer(marked, truncation=True, max_length=MAX_LENGTH)
     input_ids = enc["input_ids"]
     truncated = full_length > MAX_LENGTH
 
-    # A user can either type literal [MASK] tokens to pick exact positions,
-    # or leave plain text and let us auto-mask a random slice (same 15%
-    # recipe as training/demo_predictions.py) so the tool still does
+    # Positions come from the user's own typed "?" marks (now [MASK] tokens
+    # above), or -- if they typed none -- an auto-masked random slice (same
+    # 15% recipe as training/demo_predictions.py) so the tool still does
     # something useful on a pasted passage with no gap marked. req.restore
     # =False means "just attribute/find parallels for this text as-is" --
     # skip masking (and the whole Restoration section) entirely, for an
@@ -198,7 +225,7 @@ def analyze(req: AnalyzeRequest) -> dict:
         row_logits[list(banned_ids)] = float("-inf")
         topk = torch.topk(torch.softmax(row_logits / temperature, dim=-1), k=5)
         top_k = [
-            {"token": tokenizer.convert_ids_to_tokens([i.item()])[0], "prob": float(v.item())}
+            {"token": _prettify(tokenizer.convert_ids_to_tokens([i.item()])[0]), "prob": float(v.item())}
             for v, i in zip(topk.values, topk.indices)
         ]
         saliency, _ = text_gradient_saliency(
@@ -212,7 +239,7 @@ def analyze(req: AnalyzeRequest) -> dict:
     # a true joint-probability argmax across positions (our MLM head scores
     # each masked position independently in one forward pass, not
     # sequentially like their decoder, so there is no real beam to search).
-    best_reading = list(tokenizer.convert_ids_to_tokens(masked_ids))
+    best_reading = [_prettify(t) for t in tokenizer.convert_ids_to_tokens(masked_ids)]
     for r in restorations:
         best_reading[r["position"]] = r["top_k"][0]["token"]
     best_reading = [t for t in best_reading if t not in (tokenizer.cls_token, tokenizer.sep_token)]
@@ -247,7 +274,7 @@ def analyze(req: AnalyzeRequest) -> dict:
             })
 
     return {
-        "tokens": tokenizer.convert_ids_to_tokens(masked_ids),
+        "tokens": [_prettify(t) for t in tokenizer.convert_ids_to_tokens(masked_ids)],
         "truncated": truncated,
         "full_length": full_length,
         "max_length": MAX_LENGTH,

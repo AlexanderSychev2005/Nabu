@@ -44,7 +44,21 @@ from datasets import load_dataset
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.training.train_mbert import (
     MBertMultiTask, mark_damage_signals, build_tablet_image_index_from_hf, IMG_TRANSFORM_EVAL,
+    UNCLEAR_SIGN_TOKEN, UNKNOWN_GAP_TOKEN,
 )
+
+# Show the real transliteration damage notation the corpus itself uses
+# (single unclear sign 'x', unknown-length lacuna '...') instead of the raw
+# mBERT vocab slot names mark_damage_signals() maps them onto for training --
+# those are internal token identities, not something a reader of the demo
+# writeup should see.
+_PRETTIFY = {UNCLEAR_SIGN_TOKEN: "x", UNKNOWN_GAP_TOKEN: "..."}
+
+
+def _prettify_display(decoded: str) -> str:
+    for raw, clean in _PRETTIFY.items():
+        decoded = decoded.replace(raw, clean)
+    return decoded
 from src.data_pipeline.review_bboxes_gui import build_path_index
 from src.data_pipeline.cuneiform_unicode import atf_to_lines, _FACE_KEYS
 
@@ -533,8 +547,8 @@ def main() -> None:
                 conf, cls = probs.max(dim=-1)
                 pred_dict[task] = (cls.item(), conf.item())
 
-        masked_display = tokenizer.decode(masked_ids[1:-1], skip_special_tokens=False)
-        original_display = tokenizer.decode(input_ids[1:-1], skip_special_tokens=False)
+        masked_display = _prettify_display(tokenizer.decode(masked_ids[1:-1], skip_special_tokens=False))
+        original_display = _prettify_display(tokenizer.decode(input_ids[1:-1], skip_special_tokens=False))
 
         out.append(f"## Example {n} — `{tablet_id}` (has photo: {img is not None})\n")
 
