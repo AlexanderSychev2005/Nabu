@@ -2,11 +2,11 @@
 entries that have a usable bbox, transliteration, and complete
 (period/genre/language/provenience) metadata via cdli_cat.csv (see
 prepare_cuneiml.py for the same join). Estimated at ~128GB for the full
-candidate set (session sizing check, 2026-08-05) -- a real risk of filling
-the disk, so free space is checked before every write and downloading stops
-cleanly once free space drops below FREE_SPACE_FLOOR_GB, rather than running
-the disk to 0 and risking the rest of the system. Resumable: skips ids
-already present in the manifest.
+candidate set -- a real risk of filling the disk, so free space is checked
+before every write and downloading stops cleanly once free space drops
+below FREE_SPACE_FLOOR_GB, rather than running the disk to 0 and risking
+the rest of the system. Resumable: skips ids already present in the
+manifest.
 """
 import json
 import os
@@ -15,6 +15,7 @@ import shutil
 import urllib.request
 import io
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Optional
 
 from PIL import Image
 
@@ -30,24 +31,24 @@ FREE_SPACE_FLOOR_GB = 15
 os.makedirs(OUT_DIR, exist_ok=True)
 
 
-def free_space_gb():
+def free_space_gb() -> float:
     return shutil.disk_usage(BASE_DIR).free / (1024 ** 3)
 
 
-def valid_bbox(bb):
+def valid_bbox(bb: Optional[list]) -> bool:
     if not bb or len(bb) != 2:
         return False
     (x1, y1), (x2, y2) = bb
     return (x2 - x1) > 10 and (y2 - y1) > 10
 
 
-def has_lines(t):
+def has_lines(t: Any) -> bool:
     if not isinstance(t, dict):
         return False
     return any(t.get(face) for face in ("obverse", "reverse", "left", "right", "top", "bottom"))
 
 
-def load_candidates():
+def load_candidates() -> list[dict]:
     cdli_dict = {}
     with open(CDLI_CAT_CSV, encoding="utf-8") as f:
         for row in csv.DictReader(f):
@@ -72,7 +73,7 @@ def load_candidates():
     return list(seen.values())
 
 
-def process(item):
+def process(item: dict) -> tuple[str, str, Optional[dict]]:
     pid = str(item["id"])
     out_path = os.path.join(OUT_DIR, f"{pid}.jpg")
     if os.path.exists(out_path):
@@ -93,7 +94,7 @@ def process(item):
         return pid, f"fail: {e}", None
 
 
-def main():
+def main() -> None:
     candidates = load_candidates()
     print(f"candidates (image+bbox+text+full metadata): {len(candidates)}")
 

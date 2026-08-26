@@ -4,18 +4,15 @@ Aeneas's own design (Assael et al. 2025, Methods p.148: "The visual inputs
 are processed using a ResNet-8 ... concatenated with the relevant textual
 embeddings") -- crop first so the CNN only ever sees the tablet face, not
 the surrounding photo background/scale bar/collection card that the raw
-CuneiML bbox sometimes locks onto instead (session bbox-quality audit,
-2026-08-05).
+CuneiML bbox sometimes locks onto instead.
 
 For each id in data/vision_dataset/manifest.jsonl:
   - skipped entirely if marked "no_tablet" in data/bbox_corrections.jsonl.
   - bbox = the correction's saved box if reviewed, else the manifest's own
     (raw CuneiML) bbox if present, else skipped (nothing to crop). Cropped
-    exactly as drawn -- no added margin. An earlier version padded the box
-    by 8% to avoid clipping signs at the edge, but that could pull a
+    exactly as drawn -- no added margin: padding the box risks pulling a
     deliberately-excluded museum marker/ink mark back into frame after the
-    reviewer had specifically cropped it out (session correction,
-    2026-08-06), so the crop now trusts the reviewed box exactly.
+    reviewer specifically cropped it out.
   - resized to fit within TARGET_SIZE x TARGET_SIZE (224, matching Aeneas's
     own model input exactly -- Assael et al. 2025, Methods p.148: "a
     corresponding greyscale image of size 224 x 224") preserving aspect
@@ -24,28 +21,29 @@ For each id in data/vision_dataset/manifest.jsonl:
     an already-roughly-square bbox so squish barely affects them, but a
     rectangular/elongated one (e.g. a "pillow"-shaped letter) would get
     stretched toward square, destroying exactly the width:height signal the
-    period/genre shape hypothesis (round vs. square vs. elongated, session
-    discussion) depends on. Letterbox fill is black to match the photo's
-    own backdrop, not an artificial border. No need to hedge the stored
-    resolution against a hypothetical future architecture: the actual
-    future-proofing is data/raw/cuneiml/images_full/ (full-resolution
-    originals, kept locally) plus the recorded bbox in
-    data/bbox_corrections.jsonl, which together can regenerate a crop at
-    any resolution later without redoing the manual review.
+    period/genre shape (round vs. square vs. elongated) could otherwise
+    carry. Letterbox fill is black to match the photo's own backdrop, not
+    an artificial border. No need to hedge the stored resolution against a
+    hypothetical future architecture: the actual future-proofing is
+    data/raw/cuneiml/images_full/ (full-resolution originals, kept locally)
+    plus the recorded bbox in data/bbox_corrections.jsonl, which together
+    can regenerate a crop at any resolution later without redoing the
+    manual review.
 
 Output: data/vision_dataset_final/<id>.jpg
         data/vision_dataset_final/crops_manifest.jsonl
           {"id", "reviewed": bool} -- reviewed=False means the crop still
-          relies on CuneiML's own automated bbox (~58% reliable per the
-          session's own 24-sample audit). train_mbert_vision.py defaults to
-          reviewed-only for the first pilot; the flag lets that loosen as
-          manual review (review_bboxes_gui.py) progresses. Re-running this
-          script picks up newly-reviewed ids automatically (skips ids
-          already cropped, same as the rest of this pipeline).
+          relies on CuneiML's own automated bbox (~58% reliable per a
+          24-sample audit). train_mbert_vision.py defaults to reviewed-only
+          for the first pilot; the flag lets that loosen as manual review
+          (review_bboxes_gui.py) progresses. Re-running this script picks up
+          newly-reviewed ids automatically (skips ids already cropped, same
+          as the rest of this pipeline).
 """
 import json
 import os
 import sys
+from typing import Optional
 
 from PIL import Image
 
@@ -59,7 +57,7 @@ OUT_MANIFEST = os.path.join(OUT_DIR, "crops_manifest.jsonl")
 TARGET_SIZE = 224
 
 
-def load_corrections():
+def load_corrections() -> dict[str, dict]:
     corrections = {}
     if os.path.exists(CORRECTIONS_FILE):
         with open(CORRECTIONS_FILE, encoding="utf-8") as f:
@@ -72,7 +70,7 @@ def load_corrections():
     return corrections
 
 
-def crop_and_resize(img, bbox):
+def crop_and_resize(img: Image.Image, bbox: list) -> Optional[Image.Image]:
     w, h = img.size
     (x1, y1), (x2, y2) = bbox
     x1, x2 = sorted((x1, x2))
@@ -94,7 +92,7 @@ def crop_and_resize(img, bbox):
     return canvas
 
 
-def main():
+def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
     manifest = load_manifest()
     corrections = load_corrections()

@@ -8,104 +8,59 @@ import argparse
 import json
 import logging
 from datetime import datetime
+from typing import Callable, Optional
+
 from sklearn.metrics import f1_score
 import numpy as np
 from PIL import Image
 from torchvision import models as tv_models
 from torchvision import transforms as tv_transforms
 from transformers import (
-    AutoTokenizer, AutoModelForMaskedLM, DataCollatorForLanguageModeling,
-    Trainer, TrainingArguments, EarlyStoppingCallback, TrainerCallback,
+    AutoTokenizer, AutoModelForMaskedLM, BertTokenizer, DataCollatorForLanguageModeling,
+    EvalPrediction, PreTrainedTokenizerBase, Trainer, TrainingArguments, TrainerCallback,
+    TrainerControl, TrainerState, EarlyStoppingCallback,
 )
-from datasets import load_from_disk, load_dataset
+from datasets import Dataset, load_from_disk, load_dataset
 from tokenizers import Tokenizer as RawTokenizer
 from tokenizers.models import WordPiece as WordPieceModel
 from tokenizers.trainers import WordPieceTrainer
 from tokenizers.pre_tokenizers import Whitespace
 
-# Vision branch (--use_image): only provenience gets a picture. period and
-# genre used to get one too, but the controlled 4-way ablation (session
-# 2026-08-11) showed no reproducible benefit on either -- period was a wash
-# (matching Aeneas's own negative finding for their dating head almost
-# exactly) and genre's apparent gain flipped sign between scratch/finetune,
-# i.e. noise. provenience is the only head with a reproducible, above-noise-
-# floor effect (Ur/Nippur, confirmed in two independent vision_init runs).
-# language never got one (no plausible visual signal -- session discussion,
-# 2026-08-06). Follows Aeneas's own mechanism (Assael et al. 2025, Methods
-# p.148): a CNN feature vector is concatenated with the text embedding
-# before the head -- restricted, as in Aeneas, to the one task where images
-# actually carry signal. Unlike this project's earlier frozen-backbone pilot
-# script (train_mbert_vision.py), this is the real joint end-to-end
-# training Aeneas actually did -- "batch size of 1,024 text-image pairs"
-# (p.9) means every example carried an image slot in a single training run
-# over the whole corpus, not a separate post-hoc stage over only the
-# image-bearing subset. Tablets without a collected photo (the overwhelming
-# majority of the corpus) get an all-zero placeholder image so batch
-# tensors stay uniformly shaped -- no explicit missing-modality flag is
-# needed, the head just learns a near-constant image contribution for
-# those rows since the input carries no information.
-# Re-ran the period/genre question as a controlled --image_heads experiment
-# after the pipeline fixes below (session 2026-08-13) in case the original
-# null result had been a pipeline artifact -- it wasn't (see
-# docs/final_results.md and docs/ablation_runs/ for the full evidence:
-# period/genre stayed inside the noise floor across multiple runs;
-# provenience alone cleared it). image_heads is settled as provenience-only;
-# the CLI no longer exposes a way to change it -- see MBertMultiTask's
-# image_heads parameter if this needs reopening.
-IMG_SIZE = 224  # ResNet18's input size, matches Aeneas's own (Methods p.148) and finalize_vision_crops.py's stored size
-# Per-class image counts (~150-300) are the same order of magnitude as
-# Aeneas's own average (~8,843 images / 62 provinces =~ 142/class), not
-# orders of magnitude smaller -- but a ResNet trained fully from scratch at
-# that scale still overfits easily without the augmentation Aeneas explicitly
-# used to fight it ("image augmentations such as zooming, rotation, and
-# adjustments to brightness and contrast", Methods p.148). Widened this
-# session (2026-08-13) to match Aeneas's actual dataloader.py ranges
-# (rotation ±30, brightness/contrast 0.5-1.5x, blur, sharpen, noise) rather
-# than the earlier, much lighter guess. Three deliberate deviations, not
-# oversights: (1) no horizontal flip -- unlike a generic object photo, a
-# mirrored tablet face has reversed sign order/orientation, not a valid
-# input for this task; Aeneas doesn't use one either. (2) no grayscale
-# conversion, unlike Aeneas -- our images stay RGB because vision_init
-# pretrained/finetune loads ImageNet weights whose conv1 filters are trained
-# on 3-channel color; discarding 2/3 of that channel info fights the
-# pretraining rather than helping it, and our corpus (91% "clay", mostly one
-# region/period of excavation photography) has less of the cross-material,
-# cross-photography-style color confound that motivated Aeneas's choice.
-# Also no per-epoch random re-crop from the full original: Aeneas's zoom-crop
-# substitutes for NOT having a human-reviewed bbox at their scale (176k
-# inscriptions); ours (review_bboxes_gui.py) already is human-reviewed and
-# tight, so a from-scratch random crop would as often cut a real sign off as
-# help. (3) rotation/shear capped at 15/5, not Aeneas's 30/10 -- for the same
-# tight-bbox reason: their rotation runs on the padded-to-full-side original
-# with room to spare before their own crop is chosen, ours runs on the
-# already-tight final 224x224 crop. Checked visually on 20 random samples
-# (scratchpad/aug_sheet_*.jpg vs aug15_sheet_*.jpg, session 2026-08-13): at
-# 30/10 several near-square, frame-filling tablets (mostly Ur III
-# administrative texts, which run closer to square than the corpus average)
-# lost real inscribed corner/edge content past the frame boundary; at 15/5
-# the same samples stayed fully in frame. Normalized to ImageNet's own mean/std (not Aeneas's [-1,1], which is
-# for their from-scratch grayscale ResNet8) because vision_init
-# pretrained/finetune's ResNet18 weights expect exactly this input
-# distribution -- feeding [0,1] unnormalized pixels into pretrained BatchNorm
-# layers silently mismatches what they were trained on. Eval stays
-# deterministic (no augmentation, but same Normalize) so checkpoint
-# comparisons aren't noisy -- see TiedWeightSafeTrainer's eval_data_collator
-# override below.
+# Vision branch (--use_image): only provenience gets a picture. A controlled
+# 4-way ablation (period/genre/provenience/language, with language as an
+# always-image-blind control for run-to-run noise) found provenience is the
+# only head with a reproducible, above-noise-floor gain from the image --
+# matches Aeneas's own restriction of its vision branch to the geographic-
+# attribution head (Assael et al. 2025, Methods p.148: a CNN feature vector
+# concatenated with the text embedding before the head). image_heads stays a
+# constructor parameter rather than hardcoded, since evaluate_mbert.py and
+# demo_predictions.py construct this class directly and should keep working
+# if the scope is ever revisited -- see docs/final_results.md for the full
+# ablation evidence.
+IMG_SIZE = 224  # ResNet18's input size, matches Aeneas's own and finalize_vision_crops.py's stored size
+# Rotation/shear/color-jitter ranges approximate Aeneas's own augmentation
+# (Methods p.148), with three deliberate deviations: (1) no horizontal flip
+# -- a mirrored tablet face has reversed sign order, not a valid input. (2)
+# no grayscale conversion -- our images stay RGB because vision_init
+# pretrained/finetune loads ImageNet weights whose conv1 filters expect
+# 3-channel color. (3) rotation/shear capped at 15/5, not Aeneas's 30/10 --
+# their rotation runs on a padded original with room before their own crop
+# is chosen; ours runs on an already-tight, human-reviewed 224x224 crop,
+# where the wider range clips real inscribed content off-frame.
 IMAGENET_MEAN, IMAGENET_STD = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
 
 
-def _add_pixel_noise(t, max_level=0.05):
-    """Gaussian noise on [0,1] pixel tensor, matching Aeneas's
-    img_add_random_noise (applied pre-normalize, uniform-random strength per
-    sample so most samples get a mild dose and a few get a strong one)."""
+def _add_pixel_noise(t: torch.Tensor, max_level: float = 0.05) -> torch.Tensor:
+    """Gaussian noise on a [0,1] pixel tensor, matching Aeneas's own
+    img_add_random_noise (uniform-random strength per sample)."""
     level = random.uniform(0.0, max_level)
     return (t + torch.randn_like(t) * level).clamp(0.0, 1.0)
 
 
 IMG_TRANSFORM_TRAIN = tv_transforms.Compose([
     tv_transforms.Resize((IMG_SIZE, IMG_SIZE)),
-    tv_transforms.RandomAffine(degrees=15, shear=5),  # not Aeneas's 30/10 -- see note above, visually checked
-    tv_transforms.ColorJitter(brightness=0.4, contrast=0.4),  # approximates their 0.5-1.5x multiplicative range
+    tv_transforms.RandomAffine(degrees=15, shear=5),
+    tv_transforms.ColorJitter(brightness=0.4, contrast=0.4),
     tv_transforms.RandomApply([tv_transforms.GaussianBlur(5, sigma=(0.1, 2.0))], p=0.5),
     tv_transforms.RandomAdjustSharpness(sharpness_factor=2.0, p=0.5),
     tv_transforms.ToTensor(),
@@ -121,34 +76,35 @@ IMG_TRANSFORM_EVAL = tv_transforms.Compose([
 # The two real-damage signals that survive into the 'text' column (see
 # prepare_hf_dataset.py's clean_transliteration): a standalone 'x' is one
 # unclear sign, '...' is a lacuna of unknown length. Neither has its own
-# WordPiece token in stock mBERT, so left alone they'd tokenize into ordinary
-# maskable subwords -- unlike our sign-level 'x'/'X'/'[#]', mBERT would then
-# be trained to "restore" positions that have no real answer. We reuse two of
-# mBERT's 99 reserved [unusedN] vocab slots as dedicated sentinels (same
-# trick Lazar et al. 2021 use for their own injected tokens) so they get
-# registered as genuine special tokens -- HF's own masking collator already
-# excludes anything in additional_special_tokens from masking targets, so no
-# custom collator logic is needed once the substitution and registration are
-# done.
+# WordPiece token in stock mBERT, so left alone they'd tokenize into
+# ordinary maskable subwords -- mBERT would then be trained to "restore"
+# positions with no real answer. We reuse two of mBERT's 99 reserved
+# [unusedN] vocab slots as dedicated sentinels (same trick Lazar et al. 2021
+# use for their own injected tokens); HF's masking collator already excludes
+# anything in additional_special_tokens from masking targets.
 LONE_X_RE = re.compile(r"\bx\b")
 ELLIPSIS_RE = re.compile(r"\.\.\.+")
 UNCLEAR_SIGN_TOKEN = "[unused1]"
 UNKNOWN_GAP_TOKEN = "[unused2]"
 
-def mark_damage_signals(text):
+
+def mark_damage_signals(text: str) -> str:
     text = ELLIPSIS_RE.sub(f" {UNKNOWN_GAP_TOKEN} ", text)
     text = LONE_X_RE.sub(UNCLEAR_SIGN_TOKEN, text)
     return re.sub(r"\s+", " ", text).strip()
 
-def learn_akkadian_tokens(texts, existing_vocab, n_tokens=97, target_vocab_size=8000, min_frequency=10):
-    """Reproduce Lazar et al. 2021's other free-token trick: "we assign its
-    99 available free tokens, optimizing for maximum likelihood by the
-    WordPiece tokenization algorithm" -- they never published the exact
-    token list, so we relearn it here by training a fresh WordPiece
-    vocabulary on our own Akkadian transliteration corpus and keeping the
-    highest-frequency pieces mBERT doesn't already have. Without this,
-    Akkadian-specific sign sequences get chopped into excessive fragments by
-    mBERT's stock (mostly-modern-language) WordPiece vocab."""
+
+def learn_akkadian_tokens(
+    texts: list[str], existing_vocab: set[str], n_tokens: int = 97,
+    target_vocab_size: int = 8000, min_frequency: int = 10,
+) -> list[str]:
+    """Reproduce Lazar et al. 2021's free-token trick: they assign mBERT's
+    99 unused vocab slots by "optimizing for maximum likelihood by the
+    WordPiece tokenization algorithm" but never published the exact list --
+    relearn it here by training a fresh WordPiece vocabulary on our own
+    corpus and keeping the highest-frequency pieces mBERT doesn't already
+    have. Without this, Akkadian-specific sign sequences get chopped into
+    excessive fragments by mBERT's stock (mostly-modern-language) vocab."""
     tok = RawTokenizer(WordPieceModel(unk_token="[UNK]"))
     tok.pre_tokenizer = Whitespace()
     trainer = WordPieceTrainer(
@@ -160,20 +116,20 @@ def learn_akkadian_tokens(texts, existing_vocab, n_tokens=97, target_vocab_size=
     candidates = [t for t, _ in learned if t not in existing_vocab and t != "[UNK]" and t.replace("##", "")]
     return candidates[:n_tokens]
 
-def inject_akkadian_tokens(tokenizer, new_tokens, first_free_slot=3):
-    """Rename mBERT's unused [unusedN] vocab slots (N >= first_free_slot,
-    since 1-2 are already claimed by our damage sentinels) to the learned
-    Akkadian tokens, keeping the same embedding row id -- no vocab growth,
-    no resize_token_embeddings() needed, exactly the slot-reuse mechanism
-    Lazar et al. 2021 describe.
 
-    In this transformers version BertTokenizer's `.vocab` is a detached
-    snapshot dict -- mutating it in place does not reach the actual Rust
-    WordPiece tokenizer used for encoding (verified: get_vocab() and real
-    tokenization both stay unchanged). The only reliable way to rename a
-    slot is to rebuild the tokenizer from a modified vocab dict, so this
-    returns a *new* tokenizer instance rather than mutating in place."""
-    from transformers import BertTokenizer
+def inject_akkadian_tokens(
+    tokenizer: PreTrainedTokenizerBase, new_tokens: list[str], first_free_slot: int = 3,
+) -> tuple[BertTokenizer, int]:
+    """Rename mBERT's unused [unusedN] vocab slots (N >= first_free_slot,
+    since 1-2 are already claimed by the damage sentinels) to the learned
+    Akkadian tokens, keeping the same embedding row id -- no vocab growth,
+    no resize_token_embeddings() needed.
+
+    BertTokenizer's `.vocab` is a detached snapshot dict in this
+    transformers version -- mutating it in place never reaches the actual
+    Rust WordPiece tokenizer used for encoding. The only reliable way to
+    rename a slot is to rebuild the tokenizer from a modified vocab dict, so
+    this returns a *new* tokenizer instance rather than mutating in place."""
     vocab = dict(tokenizer.get_vocab())
     n_injected = 0
     for i, new_tok in enumerate(new_tokens):
@@ -193,21 +149,21 @@ def inject_akkadian_tokens(tokenizer, new_tokens, first_free_slot=3):
     )
     return new_tokenizer, n_injected
 
+
 class TiedWeightSafeTrainer(Trainer):
     """BertForMaskedLM ties cls.predictions.decoder.weight/bias to
-    bert.embeddings.word_embeddings.weight/bert.embeddings... (standard
-    tied-embeddings MLM head), so state_dict() has two keys aliasing the
-    same tensor storage. A real PreTrainedModel's own save_pretrained()
-    de-duplicates this automatically before writing safetensors;
-    MBertMultiTask is a plain nn.Module wrapper, so Trainer routes through
-    the generic "not a PreTrainedModel" save path in this transformers
-    version, which calls safetensors.torch.save_file() directly on the raw
-    state_dict with no format fallback (TrainingArguments.save_safetensors
-    no longer exists to opt out). Cloning each tensor gives every key its
-    own storage, satisfying safetensors' shared-memory check -- the live
-    model's actual weight tying during training is untouched, this only
-    affects what gets written to disk."""
-    def _save(self, output_dir=None, state_dict=None):
+    bert.embeddings.word_embeddings.weight (standard tied-embeddings MLM
+    head), so state_dict() has two keys aliasing the same tensor storage. A
+    real PreTrainedModel's save_pretrained() de-duplicates this
+    automatically; MBertMultiTask is a plain nn.Module wrapper, so Trainer
+    routes through the generic save path, which calls
+    safetensors.torch.save_file() directly on the raw state_dict with no
+    format fallback. Cloning each tensor gives every key its own storage,
+    satisfying safetensors' shared-memory check -- the live model's actual
+    weight tying during training is untouched, this only affects what gets
+    written to disk."""
+
+    def _save(self, output_dir: Optional[str] = None, state_dict: Optional[dict] = None) -> None:
         if state_dict is None:
             state_dict = self.model.state_dict()
         state_dict = {k: v.clone() for k, v in state_dict.items()}
@@ -218,7 +174,7 @@ class TiedWeightSafeTrainer(Trainer):
     # stopping, with-vs-without-image deltas) aren't noisy from random
     # rotation/color jitter. HF's Trainer only takes one data_collator
     # constructor arg, so swap it in for the duration of eval only.
-    def __init__(self, *args, eval_data_collator=None, **kwargs):
+    def __init__(self, *args, eval_data_collator: Optional["MBertCollator"] = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.eval_data_collator = eval_data_collator
 
@@ -232,43 +188,40 @@ class TiedWeightSafeTrainer(Trainer):
         finally:
             self.data_collator = original
 
+
 class LogToFileCallback(TrainerCallback):
     # report_to="none" leaves Trainer's default PrinterCallback printing
     # step/eval metrics straight to stdout (bypasses the `logging` module),
-    # so the FileHandler on the module logger never sees them -- same fix
-    # applied to train.py's LogToFileCallback.
-    def on_log(self, args, state, control, logs=None, **kwargs):
+    # so the FileHandler on the module logger never sees them.
+    def on_log(
+        self, args: TrainingArguments, state: TrainerState, control: TrainerControl,
+        logs: Optional[dict] = None, **kwargs,
+    ) -> None:
         if logs is not None:
             logging.getLogger(__name__).info(f"step {state.global_step}: {logs}")
 
-# mBERT baseline, following Lazar et al. 2021's finding that a pretrained
-# multilingual model finetuned on Akkadian outperforms a from-scratch model
-# at their data scale. Trained on the transliteration ('raw') side of the
-# corpus (data/processed/hf_dataset_translit), since mBERT's WordPiece
-# vocabulary has no cuneiform Unicode signs. Same joint MLM + 4 metadata
-# classification heads recipe as AkkadianModel (src/training/train.py), so
-# the two runs are comparable apart from the backbone itself.
 
 class MBertMultiTask(nn.Module):
-    def __init__(self, model_name, num_period, num_genre, num_language, num_provenience, meta_weight=1.0,
-                 use_image=False, vision_init="scratch", img_feat_dim=128, image_heads=("provenience",)):
+    """mBERT baseline: joint MLM + 4 metadata classification heads (period/
+    genre/language/provenience), following Lazar et al. 2021's finding that
+    a pretrained multilingual model finetuned on Akkadian outperforms a
+    from-scratch model at this data scale."""
+
+    def __init__(
+        self, model_name: str, num_period: int, num_genre: int, num_language: int, num_provenience: int,
+        meta_weight: float = 1.0, use_image: bool = False, vision_init: str = "scratch",
+        img_feat_dim: int = 128, image_heads: tuple[str, ...] = ("provenience",),
+    ) -> None:
         super().__init__()
         self.backbone = AutoModelForMaskedLM.from_pretrained(model_name)
         hidden_size = self.backbone.config.hidden_size
         self.use_image = use_image
         self.meta_weight = meta_weight
-        # image_heads: which heads get the concatenated image feature. Settled
-        # as provenience-only (train_mbert.py's CLI no longer exposes a way to
-        # change it -- see docs/final_results.md for the period/genre/language
-        # ablation this settled). This parameter itself stays, rather than
-        # hardcoding provenience directly in forward(), since evaluate_mbert.py
-        # and demo_predictions.py still construct this class directly and
-        # ought to keep working if that decision is ever revisited.
         self.image_heads = set(image_heads) if use_image else set()
 
         vision_head_in = hidden_size + img_feat_dim if use_image else hidden_size
 
-        def head_in_size(name):
+        def head_in_size(name: str) -> int:
             return vision_head_in if name in self.image_heads else hidden_size
 
         self.period_head = nn.Linear(head_in_size("period"), num_period)
@@ -277,28 +230,14 @@ class MBertMultiTask(nn.Module):
         self.provenience_head = nn.Linear(head_in_size("provenience"), num_provenience)
 
         if use_image:
-            # scratch: random init, fully trainable -- matches Aeneas's own
-            # from-scratch ResNet-8 (ref. 82 there is just the general He et
-            # al. residual-block paper, not a checkpoint); our image count is
-            # the same order of magnitude as theirs (~5.3k vs ~8.8k = 5% of
-            # their 176,861-inscription corpus). Session results (2026-08-06,
-            # document-granularity run): got progressively *worse* relative
-            # to the text-only baseline past step ~2000 -- plausibly just not
-            # enough data/steps for an 11M-param CNN to learn useful filters
-            # from random noise in this budget.
-            # pretrained: frozen ImageNet ResNet18, only vision_proj trains --
-            # a linear probe on fixed general-purpose (edge/texture/color)
-            # features. Same session: small, consistent, believable gains
-            # over text-only through step 1500 (period/genre/provenience all
-            # up a little, the image-blind language head flat) -- unlike
-            # scratch's reversal.
-            # finetune: same ImageNet init as pretrained, but NOT frozen --
-            # lets the CNN adapt its features to tablet photos specifically,
-            # rather than staying fixed at whatever ImageNet needed. The
-            # actual "fine-tune" in the everyday sense of the word; requested
-            # after seeing frozen "pretrained" outperform "scratch" -- worth
-            # checking whether unfreezing captures pretrained's stability
-            # *and* scratch's intended adaptability.
+            # scratch: random init, fully trainable ResNet18 -- underperforms
+            # at this image-count scale (not enough data/steps for an 11M-
+            # param CNN to learn useful filters from random noise).
+            # pretrained: frozen ImageNet ResNet18, only vision_proj trains
+            # -- a linear probe on fixed general-purpose features.
+            # finetune: same ImageNet init as pretrained, but not frozen --
+            # lets the CNN adapt its features to tablet photos specifically;
+            # this is the mode the shipped checkpoints actually use.
             weights = tv_models.ResNet18_Weights.IMAGENET1K_V1 if vision_init in ("pretrained", "finetune") else None
             resnet = tv_models.resnet18(weights=weights)
             if vision_init == "pretrained":
@@ -307,17 +246,19 @@ class MBertMultiTask(nn.Module):
             resnet.fc = nn.Identity()
             self.vision_cnn = resnet
             self.vision_proj = nn.Linear(512, img_feat_dim)
-            # Matches Aeneas's own x_img_norm (model.py: LayerNorm right after
-            # the vision embedding, before concatenation with text) -- cls_embed
-            # comes out of BERT already well-scaled by its internal LayerNorms;
-            # a raw linear projection of ResNet features has no such guarantee,
-            # especially early in training, so provenience_head would otherwise
-            # have to learn to correct for a scale mismatch between its two
-            # input halves on top of the actual classification task.
+            # Matches Aeneas's own x_img_norm (LayerNorm right after the
+            # vision embedding, before concatenation with text) -- cls_embed
+            # comes out of BERT already well-scaled by its internal
+            # LayerNorms; a raw linear projection of ResNet features has no
+            # such guarantee, especially early in training.
             self.vision_norm = nn.LayerNorm(img_feat_dim)
 
-    def forward(self, input_ids, attention_mask=None, pixel_values=None, labels=None,
-                period_labels=None, genre_labels=None, language_labels=None, provenience_labels=None):
+    def forward(
+        self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None,
+        pixel_values: Optional[torch.Tensor] = None, labels: Optional[torch.Tensor] = None,
+        period_labels: Optional[torch.Tensor] = None, genre_labels: Optional[torch.Tensor] = None,
+        language_labels: Optional[torch.Tensor] = None, provenience_labels: Optional[torch.Tensor] = None,
+    ) -> dict[str, Optional[torch.Tensor]]:
         bert_out = self.backbone.bert(input_ids=input_ids, attention_mask=attention_mask)
         seq = bert_out.last_hidden_state
         mlm_logits = self.backbone.cls(seq)
@@ -339,12 +280,9 @@ class MBertMultiTask(nn.Module):
             loss_meta_fct = nn.CrossEntropyLoss(ignore_index=-100, label_smoothing=0.1)
             loss = 0.0
 
-            # MLM=3.0 (matches AkkadianModel); meta_weight defaults to 1.0 -- raised
-            # from the original 0.25 (MLM:meta = 12:1) after comparing against
-            # Aeneas' own multi-task loss weights (restoration=3, region=2,
-            # date=1.25 -- roughly 3:2, not 12:1), and noting our metadata heads
-            # (esp. provenience, period) were still climbing when MLM had
-            # plateaued. Configurable via --meta_weight for further tuning.
+            # MLM=3.0, meta_weight defaults to 1.0 -- roughly matches
+            # Aeneas's own multi-task weighting (restoration=3, region=2,
+            # date=1.25). Configurable via --meta_weight for further tuning.
             if labels is not None and (labels != -100).any():
                 loss += 3.0 * loss_mlm_fct(mlm_logits.view(-1, mlm_logits.size(-1)), labels.view(-1))
 
@@ -362,17 +300,15 @@ class MBertMultiTask(nn.Module):
             "provenience_logits": provenience_logits,
         }
 
-def build_tablet_image_index(crops_dir, reviewed_only=True):
-    """tablet_id (CDLI "P######" form, matching prepare_hf_dataset.py's
-    to_examples()) -> PIL.Image (opened eagerly, not a lazy path -- keeps
-    _load_image agnostic to whether the index came from local files or
-    build_tablet_image_index_from_hf). Only used when --use_image; ids
-    outside this index (the overwhelming majority of the corpus -- images
-    exist for a small collected subset, not every tablet) fall back to an
-    all-zero placeholder in the collator, same as Aeneas's own training
-    (every example carries an image slot, real or not)."""
+
+def build_tablet_image_index(crops_dir: str, reviewed_only: bool = True) -> dict[str, Image.Image]:
+    """tablet_id (CDLI "P######" form) -> PIL.Image, opened eagerly. Only
+    used when --use_image; ids outside this index (the overwhelming
+    majority of the corpus) fall back to an all-zero placeholder in the
+    collator, same as Aeneas's own training (every example carries an image
+    slot, real or not)."""
     manifest_path = os.path.join(crops_dir, "crops_manifest.jsonl")
-    index = {}
+    index: dict[str, Image.Image] = {}
     if not os.path.exists(manifest_path):
         return index
     with open(manifest_path, encoding="utf-8") as f:
@@ -393,35 +329,28 @@ def build_tablet_image_index(crops_dir, reviewed_only=True):
                     pass
     return index
 
-def build_tablet_image_index_from_hf(repo_id):
+
+def build_tablet_image_index_from_hf(repo_id: str) -> dict[str, Image.Image]:
     """Same tablet_id -> PIL.Image mapping as build_tablet_image_index, but
     pulled straight from the "vision" HF config instead of a local crops
     folder -- so a training box only needs `git pull` + this script, no
-    scp'ing image folders around. All three splits are loaded and merged
-    (train/validation/test): the index is purely "does this tablet have a
-    photo", split-membership is already handled by --data_dir's own splits."""
-    from datasets import load_dataset as _load_dataset
-    vision_ds = _load_dataset(repo_id, "vision")
-    index = {}
+    scp'ing image folders around."""
+    vision_ds = load_dataset(repo_id, "vision")
+    index: dict[str, Image.Image] = {}
     for split in vision_ds:
         for row in vision_ds[split]:
             index[row["tablet_id"]] = row["image"].convert("RGB")
     return index
 
-def mark_one_line_per_tablet(dataset):
+
+def mark_one_line_per_tablet(dataset: Dataset) -> Dataset:
     """Adds an "image_tablet_id" column: equal to "tablet_id" for exactly
     one (the first-encountered) line of each tablet, "" for every other
-    line of that same tablet. TRAIN-only fix for a real skew (session
-    finding, 2026-08-06): without this, a tablet's photo is shown to the
-    model once per LINE it has (this corpus: up to 407, avg 13, median 8),
-    and that count varies systematically by class -- e.g. provenience
-    Assur averages 23 lines/tablet vs Puzriš-Dagan's 4.3, a ~5x difference
-    in effective image-training frequency despite deliberately balanced
-    per-class *tablet* counts. Capping it to one real showing per tablet
-    per epoch removes that skew entirely without touching line-level MLM
-    (Aeneas's own province-only image head, and the earlier
-    train_mbert_vision.py pilot, don't have this problem because they
-    don't operate at line granularity in the first place)."""
+    line of that same tablet. TRAIN-only fix for a real skew: without this,
+    a tablet's photo is shown to the model once per line it has (up to 407,
+    avg 13), and that count varies systematically by class -- capping it to
+    one real showing per tablet per epoch removes that skew without
+    touching line-level MLM."""
     # Plain sequential pass (not .map(num_proc>1)) -- "first encountered"
     # must follow actual row order, which parallel/batched execution
     # wouldn't guarantee.
@@ -435,41 +364,35 @@ def mark_one_line_per_tablet(dataset):
             marked.append(tid)
     return dataset.add_column("image_tablet_id", marked)
 
+
 class MBertCollator:
-    """Standard 15% MLM masking (HF's own collator) plus the 4 metadata labels
-    carried through -- unlike AkkadianModel's physical-damage collator, mBERT
-    isn't being taught the [#]-gap-expansion task, only domain-adapted MLM.
-    HF's collator already excludes anything in tokenizer.additional_special_tokens
-    from masking targets via get_special_tokens_mask(), so registering
-    UNCLEAR_SIGN_TOKEN/UNKNOWN_GAP_TOKEN as special tokens (see train(),
-    mark_damage_signals()) is enough to keep them out of the mask targets
-    here too -- no extra exclusion logic needed in this collator.
+    """Standard 15% MLM masking (HF's own collator) plus the 4 metadata
+    labels carried through. HF's collator already excludes anything in
+    tokenizer.additional_special_tokens from masking targets, so
+    registering UNCLEAR_SIGN_TOKEN/UNKNOWN_GAP_TOKEN as special tokens is
+    enough to keep them out of the mask targets here too.
 
     image_index (tablet_id -> PIL.Image) is None when --use_image is off,
-    in which case no pixel_values key is produced at all -- MBertMultiTask
-    with use_image=False never looks for one. img_transform selects
-    train (augmented) vs eval (deterministic) processing -- see
-    IMG_TRANSFORM_TRAIN/IMG_TRANSFORM_EVAL and TiedWeightSafeTrainer's
-    eval_data_collator swap.
+    in which case no pixel_values key is produced at all. img_transform
+    selects train (augmented) vs eval (deterministic) processing.
 
     context_char_max (set only for the document-granularity dataset, where
-    ~5-8% of documents exceed mBERT's hard 512-token position-embedding
-    ceiling): instead of always keeping a long document's first max_length
-    tokens, follow Aeneas's own approach (predictingthepast/train/
-    dataloader.py -- context_char_min=25, context_char_max=768,
-    context_char_random=True for their Latin/character-level setup) --
-    sample a random character window per example, so the model sees every
-    *part* of a long document across training rather than only its
-    opening. Requires "text" to still be a raw (untokenized) column on the
-    dataset -- tokenization happens here, per batch, not once in train()'s
-    .map() step. training=True gives a random start position AND random
-    window length each call (a fresh crop every epoch, unlike a one-time
-    truncation); training=False (eval) takes a fixed window from the start
-    so repeated evaluate() calls stay reproducible -- a deliberate
-    departure from Aeneas's own eval-time random start, for the same
-    determinism reason IMG_TRANSFORM_EVAL skips augmentation."""
-    def __init__(self, tokenizer, mlm_probability=0.15, image_index=None, img_transform=IMG_TRANSFORM_EVAL,
-                 context_char_min=None, context_char_max=None, max_length=96, training=False):
+    some documents exceed mBERT's 512-token position-embedding ceiling):
+    instead of always keeping a long document's first max_length tokens,
+    follow Aeneas's own approach and sample a random character window per
+    example, so the model sees every *part* of a long document across
+    training. Requires "text" to still be a raw (untokenized) column --
+    tokenization happens here, per batch. training=True gives a random
+    start position AND random window length each call; training=False
+    (eval) takes a fixed window from the start so repeated evaluate() calls
+    stay reproducible."""
+
+    def __init__(
+        self, tokenizer: PreTrainedTokenizerBase, mlm_probability: float = 0.15,
+        image_index: Optional[dict[str, Image.Image]] = None, img_transform=IMG_TRANSFORM_EVAL,
+        context_char_min: Optional[int] = None, context_char_max: Optional[int] = None,
+        max_length: int = 96, training: bool = False,
+    ) -> None:
         self.tokenizer = tokenizer
         self.mlm_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=True, mlm_probability=mlm_probability)
         self.image_index = image_index
@@ -480,7 +403,7 @@ class MBertCollator:
         self.training = training
         self._zero_image = torch.zeros(3, IMG_SIZE, IMG_SIZE)
 
-    def _load_image(self, tablet_id):
+    def _load_image(self, tablet_id: Optional[str]) -> torch.Tensor:
         img = self.image_index.get(tablet_id) if tablet_id else None
         if img is None:
             return self._zero_image
@@ -489,7 +412,7 @@ class MBertCollator:
         except Exception:
             return self._zero_image
 
-    def _window(self, text):
+    def _window(self, text: str) -> str:
         if not self.context_char_max or len(text) <= self.context_char_max:
             return text
         if self.training:
@@ -498,16 +421,14 @@ class MBertCollator:
             return text[start:start + length]
         return text[:self.context_char_max]
 
-    def _tokenize(self, ex):
+    def _tokenize(self, ex: dict) -> dict:
         text = mark_damage_signals(self._window(ex["text"]))
         enc = self.tokenizer(text, truncation=True, max_length=self.max_length)
         # MBertMultiTask.forward() only accepts input_ids/attention_mask --
-        # drop token_type_ids (BertTokenizer returns it by default), same as
-        # the pre-tokenized path already implicitly does by only selecting
-        # these two keys out of each example.
+        # drop token_type_ids (BertTokenizer returns it by default).
         return {"input_ids": enc["input_ids"], "attention_mask": enc["attention_mask"]}
 
-    def __call__(self, examples):
+    def __call__(self, examples: list[dict]) -> dict[str, torch.Tensor]:
         if self.context_char_max is not None:
             pre = [self._tokenize(ex) for ex in examples]
         else:
@@ -519,43 +440,37 @@ class MBertCollator:
             # "image_tablet_id" (see mark_one_line_per_tablet) is blank for
             # every line of a tablet except one, on the TRAIN split only --
             # falls back to plain "tablet_id" if that column wasn't added
-            # (eval collator: every line of an image-bearing tablet gets its
-            # real photo, since eval isn't fighting a training-time bias).
+            # (eval: every line of an image-bearing tablet gets its real
+            # photo, since eval isn't fighting a training-time bias).
             batch["pixel_values"] = torch.stack([
                 self._load_image(ex["image_tablet_id"] if "image_tablet_id" in ex else ex.get("tablet_id"))
                 for ex in examples
             ])
         return batch
 
-def make_preprocess_logits_for_metrics(banned_ids):
+
+def make_preprocess_logits_for_metrics(banned_ids: set[int]) -> Callable:
     """banned_ids: PAD/UNK/CLS/SEP/MASK plus the two injected damage
-    sentinels -- none of these is ever a valid restoration answer, mirroring
-    train.non_content_ids() for the sign-level model."""
+    sentinels -- none of these is ever a valid restoration answer."""
     banned = torch.tensor(sorted(banned_ids), dtype=torch.long)
 
-    def preprocess_logits_for_metrics(logits, labels):
+    def preprocess_logits_for_metrics(logits: tuple[torch.Tensor, ...], labels: tuple[torch.Tensor, ...]):
         # MBertMultiTask has no HF PretrainedConfig, so Trainer's
-        # prediction_step can't filter its output dict via
-        # model.config.keys_to_ignore_at_inference -- it converts the dict
-        # into a plain positional tuple (dropping "loss") before calling
-        # this function. Must index by position, matching
-        # MBertMultiTask.forward's dict insertion order: logits,
-        # period_logits, genre_logits, language_logits, provenience_logits.
-        # Same root cause as AkkadianModel's own config-less-model handling
-        # in train.py, which is why that file's version of this function
-        # already indexes positionally instead of by key.
+        # prediction_step converts the output dict into a plain positional
+        # tuple (dropping "loss") before calling this function -- must
+        # index by position, matching MBertMultiTask.forward's dict
+        # insertion order: logits, period_logits, genre_logits,
+        # language_logits, provenience_logits.
         mlm_logits = logits[0].clone()
         mlm_logits[..., banned.to(mlm_logits.device)] = float("-inf")
         mlm_top5 = torch.topk(mlm_logits, k=5, dim=-1).indices
 
         # Full-vocab rank of the true token, computed here (not in
         # compute_metrics) so we never have to hold the full (B, S, V)
-        # logits in the accumulated eval predictions -- same convention as
-        # evaluate.py's evaluate_top_k: rank = 1 + count of logits that beat
-        # the target's own logit. labels[0] is the primary MLM "labels"
-        # tensor (label_names[0]); -100 (unmasked) positions get clamped to
-        # a dummy valid index and filtered out downstream via the same mask
-        # compute_metrics already applies for mlm_acc/top3/top5.
+        # logits in the accumulated eval predictions: rank = 1 + count of
+        # logits that beat the target's own logit. labels[0] is the
+        # primary MLM "labels" tensor; -100 (unmasked) positions get
+        # clamped to a dummy valid index and filtered out downstream.
         mlm_labels = labels[0]
         safe_labels = mlm_labels.clamp(min=0)
         target_logits = mlm_logits.gather(-1, safe_labels.unsqueeze(-1))
@@ -566,7 +481,8 @@ def make_preprocess_logits_for_metrics(banned_ids):
 
     return preprocess_logits_for_metrics
 
-def compute_metrics(eval_pred):
+
+def compute_metrics(eval_pred: EvalPrediction) -> dict[str, float]:
     preds = eval_pred.predictions
     label_ids = eval_pred.label_ids
     metrics = {}
@@ -594,46 +510,41 @@ def compute_metrics(eval_pred):
         metrics["mlm_acc"] = float((masked_preds[:, 0] == masked_labels).mean())
         metrics["mlm_top3_acc"] = float(np.any(masked_preds[:, :3] == masked_labels[:, None], axis=1).mean())
         metrics["mlm_top5_acc"] = float(np.any(masked_preds == masked_labels[:, None], axis=1).mean())
-        # Same metric Lazar et al. 2021 report in their Table 2 (MRR + Hit@5)
-        # -- lets us cite a directly comparable number instead of only CER.
+        # Same metric Lazar et al. 2021 report (their Table 2, MRR + Hit@5).
         metrics["mlm_mrr"] = float((1.0 / mlm_rank[mlm_mask]).mean())
     else:
         metrics["mlm_acc"] = metrics["mlm_top3_acc"] = metrics["mlm_top5_acc"] = metrics["mlm_mrr"] = 0.0
 
     return metrics
 
-def train():
+
+def train() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir", type=str, default=r"C:\Programming\akkadian\data\processed\hf_dataset")
     parser.add_argument("--label_config", type=str, default=None, help="Path to label_configs.json (sizes the metadata heads); auto-resolved from --data_dir if omitted")
     parser.add_argument("--model_name", type=str, default="bert-base-multilingual-cased")
     parser.add_argument("--save_dir", type=str, default="checkpoints_mbert")
-    # 64 is untested on real hardware -- mBERT (~179M params, 12 layers) is
-    # much bigger than AkkadianModel (~41M), so this is a starting point for
-    # a 16GB Colab GPU, not a measured value like the signs track's batch
-    # size. Test and adjust the same way we tuned the signs track's batch/lr.
-    parser.add_argument("--batch_size", type=int, default=64, help="Starting point for a 16GB GPU -- untested, adjust based on actual VRAM usage")
+    parser.add_argument("--batch_size", type=int, default=64, help="Starting point for a 16GB GPU -- adjust based on actual VRAM usage")
     parser.add_argument("--grad_accum", type=int, default=4)
     parser.add_argument("--num_workers", type=int, default=4)
-    parser.add_argument("--lr", type=float, default=2e-5, help="Standard BERT finetuning LR, an order of magnitude below the from-scratch run")
-    parser.add_argument("--meta_weight", type=float, default=1.0, help="Loss weight for each metadata head (period/genre/language/provenience); MLM restoration is fixed at 3.0")
-    parser.add_argument("--epochs", type=int, default=20, help="Lazar et al. 2021 finetune mBERT for 20 epochs on Akkadian; matched here as the closest precedent")
+    parser.add_argument("--lr", type=float, default=2e-5, help="Standard BERT finetuning LR")
+    parser.add_argument("--meta_weight", type=float, default=1.0, help="Loss weight for each metadata head; MLM restoration is fixed at 3.0")
+    parser.add_argument("--epochs", type=int, default=20, help="Lazar et al. 2021 finetune mBERT for 20 epochs on Akkadian")
     parser.add_argument("--eval_steps", type=int, default=500)
     parser.add_argument("--early_stopping_patience", type=int, default=4)
-    # Real token-length distribution (measured against combined_unique.jsonl
-    # with mBERT's own WordPiece tokenizer): median=18, p99=72, p99.9=120 --
-    # 96 covers 99.7% of examples at little more than half the attention
-    # FLOPs of 128.
+    # Real token-length distribution (mBERT's own WordPiece tokenizer over
+    # combined_unique.jsonl): median=18, p99=72, p99.9=120 -- 96 covers
+    # 99.7% of examples at little more than half the attention FLOPs of 128.
     parser.add_argument("--max_length", type=int, default=96)
     parser.add_argument("--precision", type=str, choices=["fp32", "fp16", "bf16"], default="fp16", help="Mixed precision mode -- fp16 for T4/Colab, bf16 for Ampere+ (A100/newer)")
     parser.add_argument("--resume_from_checkpoint", type=str, default=None, help="Path to a specific checkpoint, or 'auto' to resume from the latest one in --save_dir")
-    parser.add_argument("--use_image", action="store_true", help="Add the vision branch (Aeneas-style concat), always scoped to provenience_head only and ImageNet-finetune init -- off by default. See docs/final_results.md for why these are no longer configurable: the period/genre and scratch/pretrained/finetune ablations are settled, not open choices")
+    parser.add_argument("--use_image", action="store_true", help="Add the vision branch (Aeneas-style concat), scoped to provenience_head only, ImageNet-finetune init")
     parser.add_argument("--crops_dir", type=str, default=r"C:\Programming\akkadian\data\vision_dataset_final", help="Dir with <tablet id>.jpg crops + crops_manifest.jsonl (see finalize_vision_crops.py); ignored if --images_from_hf")
-    parser.add_argument("--include_unreviewed", action="store_true", help="Also use tablets whose bbox was never manually reviewed (raw CuneiML bbox, ~58%% reliable) -- off by default, and not meaningful with --images_from_hf (the published vision config is reviewed-only already)")
-    parser.add_argument("--images_from_hf", action="store_true", help="Load the vision config straight from --data_dir's HF repo instead of a local --crops_dir -- no scp'ing image folders to a training box")
+    parser.add_argument("--include_unreviewed", action="store_true", help="Also use tablets whose bbox was never manually reviewed -- off by default")
+    parser.add_argument("--images_from_hf", action="store_true", help="Load the vision config straight from --data_dir's HF repo instead of a local --crops_dir")
     parser.add_argument("--hf_config", type=str, default="default", help="Which HF dataset config to load when --data_dir is a Hub repo id (e.g. 'documents' for the tablet-granularity dataset)")
-    parser.add_argument("--context_char_min", type=int, default=32, help="Aeneas-style random text windowing (predictingthepast/train/dataloader.py): minimum window length in characters. Only used if --context_char_max is set")
-    parser.add_argument("--context_char_max", type=int, default=None, help="Enables random-window sampling of 'text' at collate time instead of always keeping the first --max_length tokens -- for the document-granularity dataset, where some documents badly exceed mBERT's 512-token position-embedding ceiling. None (default) = old behavior, pre-tokenize once and truncate from the start")
+    parser.add_argument("--context_char_min", type=int, default=32, help="Aeneas-style random text windowing: minimum window length in characters. Only used if --context_char_max is set")
+    parser.add_argument("--context_char_max", type=int, default=None, help="Enables random-window sampling of 'text' at collate time instead of always keeping the first --max_length tokens. None (default) = pre-tokenize once and truncate from the start")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -648,10 +559,9 @@ def train():
     logger = logging.getLogger(__name__)
     logger.info(f"Using device: {device}")
 
-    # use_fast=False: inject_akkadian_tokens() rebuilds a BertTokenizer from a
-    # modified vocab dict, which only the plain-Python slow tokenizer class
-    # supports as a constructor argument. WordPiece tokenization itself is
-    # identical between the two for BERT.
+    # use_fast=False: inject_akkadian_tokens() rebuilds a BertTokenizer from
+    # a modified vocab dict, which only the slow tokenizer class supports as
+    # a constructor argument. WordPiece tokenization is identical either way.
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=False)
 
     logger.info(f"Loading datasets from {args.data_dir} (config={args.hf_config})...")
@@ -660,29 +570,19 @@ def train():
     else:
         hf_ds = load_from_disk(args.data_dir)
 
-    # Lazar et al. 2021's other free-token trick (see learn_akkadian_tokens
-    # docstring) -- reserve slots 3-99 (1-2 go to the damage sentinels below)
-    # for WordPiece pieces learned from our own Akkadian corpus, so common
-    # sign/word sequences aren't needlessly fragmented by mBERT's stock vocab.
     logger.info("Learning Akkadian-specific WordPiece tokens for mBERT's free vocab slots...")
     akkadian_tokens = learn_akkadian_tokens(hf_ds["train"]["text"], set(tokenizer.get_vocab().keys()), n_tokens=97)
     tokenizer, n_injected = inject_akkadian_tokens(tokenizer, akkadian_tokens, first_free_slot=3)
     logger.info(f"Injected {n_injected} Akkadian tokens into mBERT's unused[3..{2 + n_injected}] slots")
 
-    # Reuse 2 of mBERT's existing [unusedN] embedding rows -- add_special_tokens
-    # on a token string already in the vocab only registers it as special
-    # (so the tokenizer stops splitting it and the masking collator stops
-    # masking it), it does not grow the vocab or add a new row.
+    # add_special_tokens on a token string already in the vocab only
+    # registers it as special (stops it being split, stops it being
+    # masked) -- it does not grow the vocab or add a new embedding row.
     tokenizer.add_special_tokens({"additional_special_tokens": [UNCLEAR_SIGN_TOKEN, UNKNOWN_GAP_TOKEN]})
 
-    # Same dataset as train.py -- we tokenize the 'text' (transliteration)
-    # column with mBERT's own WordPiece tokenizer; train.py instead tokenizes
-    # the sibling 'signs' column with our CharacterTokenizer.
-    #
-    # --context_char_max skips pre-tokenization here entirely: MBertCollator
+    # --context_char_max skips pre-tokenization entirely: MBertCollator
     # tokenizes from raw "text" per batch instead, so it can draw a fresh
-    # random character window each time (see MBertCollator._window). "signs"
-    # is still unused by this script either way.
+    # random character window each time (see MBertCollator._window).
     if args.context_char_max is not None:
         hf_ds = hf_ds.remove_columns(["signs"])
     else:
@@ -707,8 +607,7 @@ def train():
                         f"everything else gets an all-zero placeholder image")
         # TRAIN only: cap each tablet to one real image showing per epoch
         # (see mark_one_line_per_tablet) -- eval keeps every line's real
-        # image, since eval isn't fighting a training-time frequency bias.
-        # A no-op at document granularity (already one row per tablet).
+        # image. A no-op at document granularity (already one row/tablet).
         train_dataset = mark_one_line_per_tablet(train_dataset)
         n_marked = sum(1 for t in train_dataset["image_tablet_id"] if t)
         logger.info(f"mark_one_line_per_tablet: {n_marked} rows (of {len(train_dataset)}) keep their real "
@@ -775,9 +674,7 @@ def train():
         # sees a batch -- breaks both --context_char_max (collator
         # tokenizes from "text" itself) and --use_image (collator looks up
         # "tablet_id"/"image_tablet_id"), neither of which is a forward()
-        # parameter. Caught this only via a real Trainer run on the AMD
-        # box; direct collator() calls in local smoke tests never
-        # exercised Trainer's own column-pruning at all.
+        # parameter.
         remove_unused_columns=False,
     )
 
@@ -804,6 +701,7 @@ def train():
     with open(os.path.join(args.save_dir, f"training_history_{timestamp}.json"), "w", encoding="utf-8") as f:
         json.dump(trainer.state.log_history, f, indent=2, ensure_ascii=False)
     logger.info("History saved.")
+
 
 if __name__ == "__main__":
     train()

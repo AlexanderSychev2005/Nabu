@@ -2,11 +2,13 @@ import os
 import sys
 import json
 import argparse
+from typing import Optional
+
 import numpy as np
 import torch
 from safetensors.torch import load_file
 from sklearn.metrics import classification_report
-from transformers import AutoTokenizer, TrainingArguments, Trainer
+from transformers import AutoTokenizer, PreTrainedTokenizerBase, TrainingArguments, Trainer
 from datasets import load_from_disk, load_dataset
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -19,7 +21,7 @@ from src.training.train_mbert import (
 )
 
 
-def levenshtein(a, b):
+def levenshtein(a: str, b: str) -> int:
     """Plain character-level edit distance (no external dependency needed
     for the short WordPiece-token strings this is used on)."""
     if a == b:
@@ -38,7 +40,7 @@ def levenshtein(a, b):
     return prev[lb]
 
 
-def mlm_cer(preds, label_ids, tokenizer):
+def mlm_cer(preds: tuple, label_ids: tuple, tokenizer: PreTrainedTokenizerBase) -> float:
     """Character-level restoration error for the masked positions, unlike
     Aeneas/Ithaca's CER this is NOT length-stratified: their stratification
     (average per masked-span-length, then average across lengths 1-20)
@@ -65,14 +67,11 @@ def mlm_cer(preds, label_ids, tokenizer):
     return total_edits / total_chars if total_chars else 0.0
 
 
-def per_class_report(preds_by_task, labels_by_task, label_configs):
+def per_class_report(preds_by_task: dict[str, np.ndarray], labels_by_task: dict[str, np.ndarray], label_configs: dict) -> dict:
     """Per-VALUE precision/recall/f1/support for each metadata task --
     compute_metrics (train_mbert.py) only reports the macro average, which
-    hides exactly the thing worth knowing when comparing a text-only run
-    against a --use_image run: whether a given head's lift (or drop) is
-    spread evenly across its classes or concentrated in one or two
-    (session discussion, 2026-08-06 -- e.g. the val-set sample-size
-    caveats already flagged for Royal Inscriptions/Lexical/Assur)."""
+    hides whether a given head's lift (or drop) is spread evenly across
+    its classes or concentrated in one or two."""
     report = {}
     for task, preds in preds_by_task.items():
         labels = labels_by_task[task]

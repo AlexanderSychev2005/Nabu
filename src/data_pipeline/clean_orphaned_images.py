@@ -38,11 +38,11 @@ CROPS_MANIFEST = os.path.join(CROPS_DIR, "crops_manifest.jsonl")
 BBOX_CSV = os.path.join(CROPS_DIR, "bboxes.csv")
 
 
-def to_tablet_id(pid):
+def to_tablet_id(pid: str) -> str:
     return "P" + pid.zfill(6) if pid.isdigit() else pid
 
 
-def main():
+def main() -> None:
     text_ds = load_from_disk(TEXT_DATASET_DIR)
     matched = set()
     for split in ("train", "validation", "test"):

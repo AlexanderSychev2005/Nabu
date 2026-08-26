@@ -1,7 +1,7 @@
 """Assemble a per-head, roughly-balanced RAW image dataset for the vision-
 conditioned heads (provenience, genre, period -- language excluded, no
-plausible visual signal, see session discussion 2026-08-05). Only classes
-clearing a minimum-count floor are included (default 50, matching CuneiML's
+plausible visual signal). Only classes clearing a minimum-count floor are
+included (default 50, matching CuneiML's
 own precedent for discarding rare classes -- Chen et al. 2023, section 5);
 classes below the floor are left unsupported by images and keep working via
 text as before, rather than being force-fit with too little data.
@@ -41,6 +41,7 @@ import shutil
 import urllib.request
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
 
 from PIL import Image
 
@@ -55,7 +56,7 @@ FREE_SPACE_FLOOR_GB = 15
 MAX_WORKERS = 8
 
 
-def map_provenience(p):
+def map_provenience(p: str) -> str:
     if not p:
         return "Unknown"
     p = p.lower()
@@ -74,7 +75,7 @@ def map_provenience(p):
     return "Unknown"
 
 
-def map_genre(g):
+def map_genre(g: str) -> str:
     if not g:
         return "Unknown"
     g = g.lower()
@@ -90,7 +91,7 @@ def map_genre(g):
     return "Unknown"
 
 
-def map_period(p):
+def map_period(p: str) -> str:
     if not p:
         return "Unknown"
     p = p.lower()
@@ -109,13 +110,10 @@ def map_period(p):
 
 
 # Classes below cleared the >=50-example floor under the relaxed (single-
-# field) filter, per the session's counting pass (2026-08-05). Ugarit (0
-# candidates) / Nimrud (2) excluded for real -- not enough source photos
-# exist in CuneiML+cdli_cat regardless of collection effort. Uruk was also
-# excluded by that pass but a recount (session 2026-08-11, using the same
-# load_all_candidates() the script itself runs) found 68 real candidates --
-# above the floor. That original count was stale/wrong; Uruk is back in.
-# Neo-Babylonian/Late Antiquity (period) still excluded, uses images anyway.
+# field) filter. Ugarit (0 candidates) / Nimrud (2) excluded for real -- not
+# enough source photos exist in CuneiML+cdli_cat regardless of collection
+# effort. Neo-Babylonian/Late Antiquity (period) still excluded, uses images
+# anyway.
 HEADS = {
     "provenience": {
         "field": "provenience", "mapper": map_provenience,
@@ -132,11 +130,11 @@ HEADS = {
 }
 
 
-def free_space_gb():
+def free_space_gb() -> float:
     return shutil.disk_usage(BASE_DIR).free / (1024 ** 3)
 
 
-def load_corrections():
+def load_corrections() -> dict[str, dict]:
     corrections = {}
     if os.path.exists(CORRECTIONS_FILE):
         with open(CORRECTIONS_FILE, encoding="utf-8") as f:
@@ -149,7 +147,7 @@ def load_corrections():
     return corrections
 
 
-def load_all_candidates():
+def load_all_candidates() -> dict[str, tuple[dict, dict]]:
     cdli_dict = {}
     with open(CDLI_CAT_CSV, encoding="utf-8") as f:
         for row in csv.DictReader(f):
@@ -160,7 +158,7 @@ def load_all_candidates():
     with open(JSON_FILE, encoding="utf-8") as f:
         data = json.load(f)
 
-    def has_lines(t):
+    def has_lines(t: Any) -> bool:
         if not isinstance(t, dict):
             return False
         return any(t.get(face) for face in ("obverse", "reverse", "left", "right", "top", "bottom"))
@@ -174,7 +172,7 @@ def load_all_candidates():
     return seen
 
 
-def fetch_and_save(pid, img_url, out_path):
+def fetch_and_save(pid: str, img_url: str, out_path: str) -> tuple[str, str]:
     local_path = os.path.join(FULL_IMG_DIR, f"{pid}.jpg")
     try:
         if os.path.exists(local_path):
@@ -193,7 +191,7 @@ def fetch_and_save(pid, img_url, out_path):
         return pid, f"fail: {e}"
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--max_per_class", type=int, default=300)
     parser.add_argument("--min_class_count", type=int, default=50)

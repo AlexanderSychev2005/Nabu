@@ -3,10 +3,10 @@ document_embedding -- Aeneas-style 0.5*([CLS] + mean of the rest)) per
 tablet, for the web demo's similar-document lookup (src/web/app.py). No
 retraining -- reuses the already fine-tuned checkpoint. Uses
 checkpoints_final_vision (not checkpoints_final_text) to match app.py's own
-single-model-at-inference design (session 2026-08-24): app.py now always
-queries checkpoints_final_vision, so a live query embedding and this
-precomputed corpus must come from the same backbone weights, or their
-cosine similarity would be comparing two different embedding spaces.
+single-model-at-inference design: app.py always queries
+checkpoints_final_vision, so a live query embedding and this precomputed
+corpus must come from the same backbone weights, or their cosine
+similarity would be comparing two different embedding spaces.
 document_embedding() itself never touches the image branch (it only reads
 model.backbone.bert's hidden states), so this works for every document
 regardless of whether it has a photo -- use_image=True below is only there
@@ -24,6 +24,7 @@ import argparse
 import json
 import os
 import sys
+from typing import Optional
 
 import numpy as np
 import torch
@@ -73,7 +74,7 @@ if __name__ == "__main__":
     print(f"Loading dataset {args.data_dir} ({args.hf_config})...")
     ds = load_dataset(args.data_dir, args.hf_config)
 
-    def label_name(task, idx):
+    def label_name(task: str, idx: Optional[int]) -> Optional[str]:
         return label_names[task][idx] if idx is not None and idx != -100 else None
 
     embeddings, meta = [], []

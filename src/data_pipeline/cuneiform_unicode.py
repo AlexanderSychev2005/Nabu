@@ -3,9 +3,7 @@ Unicode cuneiform signs} per line. Ported from CuneiML's own converter
 (github.com/taineleau/CuneiML, CC0), the same tool used to build CuneiML's
 own 'signs' field -- so tablets we pull from the raw CDLI ATF dump / eBL get
 signs through the identical process as the rest of the corpus, instead of
-sitting with an empty 'signs' column (session 2026-08-12: user asked to
-unify signs+transliteration across all sources rather than leaving the
-bulk-backfilled tablets text-only).
+sitting with an empty 'signs' column.
 
 Vendored sign list: data/raw/cuneiform_unicode_vocab/{token.tsv,
 cuneiform_vocab.txt} (8200 entries total, copied verbatim from the CuneiML
@@ -14,6 +12,7 @@ repo, same CC0 license). No network calls, no external API.
 import os
 import re
 from collections import Counter
+from typing import Optional
 
 VOCAB_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -23,7 +22,7 @@ VOCAB_DIR = os.path.join(
 _FACE_KEYS = ("obverse", "reverse", "left", "right", "top", "down", "surface a")
 
 
-def _load_vocab():
+def _load_vocab() -> dict[str, str]:
     text2sign = {}
     for fname in ("cuneiform_vocab.txt", "token.tsv"):
         path = os.path.join(VOCAB_DIR, fname)
@@ -45,13 +44,13 @@ _TEXT2SIGN = _load_vocab()
 _S_TOKENS = ("<B>", "<M>", "<S>", "<D>", "<munus>", "<ansze>", "<ki>", "<disz>", "x")
 
 
-def _remove_at(x):
+def _remove_at(x: str) -> Optional[str]:
     if x.endswith("@c)") or x.endswith("@t)"):
         return x[:-3] + ")"
     return None
 
 
-def _remove_spaces(signs):
+def _remove_spaces(signs: list[str]) -> list[str]:
     out = []
     for item in signs:
         if item == "<S>" and out and out[-1] == "<S>":
@@ -60,7 +59,7 @@ def _remove_spaces(signs):
     return out
 
 
-def atf_to_lines(raw_text):
+def atf_to_lines(raw_text: str) -> tuple[list[dict], Counter, int]:
     """raw_text: a tablet's full ATF body (line-numbered, with @face/#atf/$
     structural markers) -- e.g. one &P###### chunk's body from the CDLI bulk
     dump, or an eBL fragment's 'atf' field, unmodified.
@@ -77,12 +76,11 @@ def atf_to_lines(raw_text):
     # catalogued sign-numbers (e.g. "M157", "1(N14)"), not real cuneiform
     # syllables -- _TEXT2SIGN can't resolve them, and a handful of numeral
     # tokens (Nxx) accidentally DO resolve, letting garbled M/N fragments
-    # leak into 'text' instead of being cleanly dropped as empty (session
-    # 2026-08-22 finding: 200 documents in the corpus were contaminated
-    # this way before this check existed). Every other ATF lang code
-    # observed in our sources (sux, akk, qeb/Eblaite, xhu, qcu, urartian,
-    # hit, uga, ...) is genuine syllabic cuneiform and parses correctly, so
-    # this is a targeted exclusion, not a blanket non-akk/sux filter.
+    # leak into 'text' instead of being cleanly dropped as empty. Every
+    # other ATF lang code observed in our sources (sux, akk, qeb/Eblaite,
+    # xhu, qcu, urartian, hit, uga, ...) is genuine syllabic cuneiform and
+    # parses correctly, so this is a targeted exclusion, not a blanket
+    # non-akk/sux filter.
     if re.search(r"(?m)^#atf:\s*lang\s+(qpc|qpe)\b", raw_text):
         return [], Counter(), 0
 
@@ -130,14 +128,11 @@ def atf_to_lines(raw_text):
         #    keep their content, only the bracket characters themselves
         #    are stripped (matches _BRACKET_CHARS -- Section 3 of the
         #    paper draft states restorations are kept, not discarded, for
-        #    the exact same reason Aeneas gives). An earlier version of
-        #    this function instead mapped {d} to a bare literal "D" glued
-        #    onto the next word with no separator (found via the web demo:
-        #    "Dmarduk" tokenizing as "D"+"##mar"+"##duk" instead of one
-        #    clean word) and deleted [...] spans outright, content and
-        #    all, silently producing orphaned word-fragments with no gap
-        #    marker in their place -- both inconsistent with the policy
-        #    actually documented for the rest of the corpus.
+        #    the exact same reason Aeneas gives). Do not regress to mapping
+        #    {d} onto a bare literal "D" glued to the next word (tokenizes
+        #    as "D"+"##mar"+"##duk" instead of one clean word) or deleting
+        #    [...] spans outright -- both silently break policy elsewhere
+        #    in the corpus.
         #  - sign_src: aggressively stripped (same recipe as before),
         #    used only to look up Unicode signs below -- losing bracket/
         #    brace content here doesn't matter, since 'signs' is a

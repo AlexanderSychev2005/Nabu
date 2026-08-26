@@ -2,6 +2,8 @@ import os
 import json
 import glob
 import zipfile
+from typing import Optional
+
 from tqdm import tqdm
 
 # ORACC projects that are lexical lists / gazetteers / catalogue indexes with
@@ -10,7 +12,7 @@ from tqdm import tqdm
 METADATA_FIELDS = ["period", "genre", "provenience", "language", "dialect", "material", "object_type", "script", "ruler"]
 
 
-def extract_utf8(gdl_list, out):
+def extract_utf8(gdl_list: list[dict], out: list[str]) -> None:
     for g in gdl_list:
         if g.get("gdl_type") == "diszless" and "group" in g:
             # A numeral value (e.g. "15", "2/3") -- ORACC's own utf8 field on
@@ -38,7 +40,7 @@ def extract_utf8(gdl_list, out):
             extract_utf8(g["group"], out)
 
 
-def parse_corpus_json(data, metadata):
+def parse_corpus_json(data: dict, metadata: dict) -> list[dict]:
     lines = []
     current_raw, current_signs, current_num = [], [], ""
 
@@ -79,7 +81,7 @@ def parse_corpus_json(data, metadata):
     return lines
 
 
-def catalogue_metadata(members, textid):
+def catalogue_metadata(members: dict, textid: str) -> tuple[dict, Optional[str]]:
     member = members.get(textid)
     if not member:
         return {}, None
@@ -90,7 +92,7 @@ def catalogue_metadata(members, textid):
     return meta, cdli_id
 
 
-def process_zip(zip_path, out_f, seen_signs):
+def process_zip(zip_path: str, out_f, seen_signs: set[str]) -> dict:
     stats = {"total": 0, "written": 0, "skipped_empty": 0, "skipped_dupe": 0, "cdli_ids": set()}
     try:
         z = zipfile.ZipFile(zip_path)
@@ -146,7 +148,7 @@ def process_zip(zip_path, out_f, seen_signs):
     return stats
 
 
-def main():
+def main() -> None:
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     RAW_DIR = os.path.join(base_dir, "data", "raw", "oracc")
     OUTPUT_FILE = os.path.join(base_dir, "data", "interim", "oracc.jsonl")

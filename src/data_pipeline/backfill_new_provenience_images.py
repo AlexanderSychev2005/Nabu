@@ -1,7 +1,7 @@
-"""Collect candidate photos for the 33 provenience classes added in the
-session-2026-08-22 corpus-cleanup (Hattusa, Mari, Ebla, Susa, Babylon, ...) --
-these were entirely unmapped before, so the existing vision_dataset has zero
-or near-zero coverage for them even where CDLI has plenty of photographed
+"""Collect candidate photos for the 33 provenience classes added later in the
+corpus cleanup (Hattusa, Mari, Ebla, Susa, Babylon, ...) -- these were
+entirely unmapped before, so the existing vision_dataset has zero or
+near-zero coverage for them even where CDLI has plenty of photographed
 tablets. Caps confirmed with the user: up to ~300/class (matches the
 original 12-class convention), floor of 50 available candidates or the class
 is skipped (same floor collect_vision_dataset.py already uses).
@@ -21,8 +21,7 @@ provenience maps to one of the new classes):
 
 Photos: reused from data/raw/cuneiml/images_full if already cached there
 (no network call -- checked first), else fetched from CDLI directly (3
-workers, same gentle rate matching the earlier-session finding that CDLI's
-photo endpoint chokes on 8 concurrent connections).
+workers -- CDLI's photo endpoint chokes on higher concurrency).
 
 Output:
   data/interim/new_provenience_images_documents.jsonl -- new document rows
@@ -43,6 +42,7 @@ import sys
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional
 
 from PIL import Image
 from datasets import load_from_disk
@@ -72,7 +72,7 @@ NEW_CLASSES = [
 ]
 
 
-def existing_corpus_ids():
+def existing_corpus_ids() -> set[str]:
     ids = set()
     ds = load_from_disk(os.path.join(BASE_DIR, "data", "processed", "hf_dataset_documents_with_cdli_bulk"))
     for split in ds:
@@ -80,7 +80,7 @@ def existing_corpus_ids():
     return ids
 
 
-def images_full_index():
+def images_full_index() -> tuple[set[str], dict[str, Optional[list]]]:
     have = set(f[:-4] for f in os.listdir(IMAGES_FULL_DIR) if f.endswith(".jpg"))
     bboxes = {}
     with open(IMAGES_FULL_MANIFEST, encoding="utf-8") as f:
@@ -90,13 +90,13 @@ def images_full_index():
     return have, bboxes
 
 
-def build_atf_body_index():
+def build_atf_body_index() -> dict[str, str]:
     content = open(ATF_PATH, encoding="utf-8", errors="replace").read()
     chunks = re.split(r"(?m)^&(P\d{6})", content)
     return {chunks[i]: (chunks[i + 1] if i + 1 < len(chunks) else "") for i in range(1, len(chunks), 2)}
 
 
-def build_ebl_atf_index():
+def build_ebl_atf_index() -> dict[str, str]:
     frags = json.load(open(EBL_PATH, encoding="utf-8"))
     idx = {}
     for f in frags:
@@ -106,7 +106,7 @@ def build_ebl_atf_index():
     return idx
 
 
-def parse_tablet_text(body):
+def parse_tablet_text(body: str) -> str:
     parsed, _misses, _tok = atf_to_lines(body)
     texts = []
     for ln in parsed:
@@ -119,7 +119,7 @@ def parse_tablet_text(body):
     return re.sub(r"\s+", " ", " ".join(texts)).strip()
 
 
-def fetch_photo(tid):
+def fetch_photo(tid: str) -> Optional[bytes]:
     url = f"https://cdli.mpiwg-berlin.mpg.de/dl/photo/{tid}.jpg"
     for _ in range(3):
         try:
@@ -132,7 +132,7 @@ def fetch_photo(tid):
     return None
 
 
-def main():
+def main() -> None:
     have = existing_corpus_ids()
     print(f"tablets already in the corpus: {len(have)}")
 

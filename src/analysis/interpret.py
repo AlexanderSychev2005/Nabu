@@ -3,35 +3,39 @@ no retraining, all of this runs on top of checkpoints_final_text/_vision.
 
 Two explanation methods, chosen to match what Aeneas's own authors settled
 on (aeneas.pdf, Methods): gradient saliency (Simonyan et al. 2014's
-"vanilla gradient" method, ref. 27/83 there) for text, not raw
-attention-weight visualization -- the paper explicitly notes attention's
-reliability as an explanation is disputed, while their historians found
-gradient saliency useful. Grad-CAM is the direct convolutional-network
-analogue for the ResNet18 image branch (Aeneas uses ResNet-8 + a similar
-image saliency map for the same head).
+"vanilla gradient" method) for text, not raw attention-weight visualization
+-- the paper explicitly notes attention's reliability as an explanation is
+disputed, while their historians found gradient saliency useful. Grad-CAM
+is the direct convolutional-network analogue for the ResNet18 image branch
+(Aeneas uses ResNet-8 + a similar image saliency map for the same head).
 
 Also: document_embedding()/nearest_documents(), the same "historically
-enriched embedding" Aeneas's contextualization mechanism builds (their
-Methods: average of the torso's first output and the mean of the rest) --
-translated to our BERT encoder as 0.5*([CLS] + mean of the other real
-tokens). Aeneas's own ablation found this simple, un-trained combination
-beat trained retrieval alternatives at their data scale; ours is smaller
-still, so we inherit the same design rather than building a separate
-retrieval model.
+enriched embedding" Aeneas's contextualization mechanism builds (average of
+the torso's first output and the mean of the rest) -- translated to our
+BERT encoder as 0.5*([CLS] + mean of the other real tokens). Aeneas's own
+ablation found this simple, un-trained combination beat trained retrieval
+alternatives at their data scale; ours is smaller still, so we inherit the
+same design rather than building a separate retrieval model.
 """
+from typing import Optional
+
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch import nn
 
 
-def text_gradient_saliency(model, input_ids, attention_mask, target, position=None,
-                            pixel_values=None, banned_ids=None):
+def text_gradient_saliency(
+    model: nn.Module, input_ids: torch.Tensor, attention_mask: torch.Tensor, target: str,
+    position: Optional[int] = None, pixel_values: Optional[torch.Tensor] = None,
+    banned_ids: Optional[set[int]] = None,
+) -> tuple[np.ndarray, int]:
     """Per-token gradient-norm saliency for one scalar target logit.
 
     target="mlm": saliency for the top-1 restored token at `position`
-    (banned_ids excluded from the argmax, same convention as topk_at in
-    demo_predictions.py). target in ("period","genre","language",
-    "provenience"): saliency for that head's own top-1 predicted class.
+    (banned_ids excluded from the argmax). target in ("period", "genre",
+    "language", "provenience"): saliency for that head's own top-1
+    predicted class.
 
     Returns (scores, target_id): scores is a (seq_len,) float32 numpy array
     in [0, 1] (gradient L2-norm per token's input embedding, max-normalized).
@@ -67,7 +71,10 @@ def text_gradient_saliency(model, input_ids, attention_mask, target, position=No
     return scores, target_id
 
 
-def image_gradcam(model, input_ids, attention_mask, pixel_values, target_class=None):
+def image_gradcam(
+    model: nn.Module, input_ids: torch.Tensor, attention_mask: torch.Tensor,
+    pixel_values: torch.Tensor, target_class: Optional[int] = None,
+) -> tuple[np.ndarray, int]:
     """Grad-CAM over the ResNet18 provenience branch's last conv block
     (layer4, the standard Grad-CAM choice: the last feature map that still
     has spatial extent). Returns (cam, target_class): cam is a (7, 7)
@@ -100,7 +107,7 @@ def image_gradcam(model, input_ids, attention_mask, pixel_values, target_class=N
     return cam, target_class
 
 
-def document_embedding(model, input_ids, attention_mask):
+def document_embedding(model: nn.Module, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> np.ndarray:
     """0.5*([CLS] + mean of the other real tokens) -- see module docstring."""
     with torch.no_grad():
         bert_out = model.backbone.bert(input_ids=input_ids, attention_mask=attention_mask)
@@ -113,14 +120,17 @@ def document_embedding(model, input_ids, attention_mask):
     return emb.detach().cpu().numpy().astype(np.float32)
 
 
-def nearest_documents(query_emb, doc_embeddings, doc_ids, k=5, exclude_id=None):
+def nearest_documents(
+    query_emb: np.ndarray, doc_embeddings: np.ndarray, doc_ids: list[str],
+    k: int = 5, exclude_id: Optional[str] = None,
+) -> list[tuple[str, float]]:
     """Cosine similarity top-k against a precomputed (N, hidden) matrix
     (see compute_embeddings.py). Returns a list of (tablet_id, score)."""
     q = query_emb / (np.linalg.norm(query_emb) + 1e-8)
     d = doc_embeddings / (np.linalg.norm(doc_embeddings, axis=1, keepdims=True) + 1e-8)
     sims = d @ q
     order = np.argsort(-sims)
-    results = []
+    results: list[tuple[str, float]] = []
     for i in order:
         tid = doc_ids[i]
         if tid == exclude_id:

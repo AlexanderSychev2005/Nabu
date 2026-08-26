@@ -30,6 +30,7 @@ import csv
 import json
 import os
 import sys
+from typing import Any
 
 from datasets import Dataset, DatasetDict, Features, Image, Value, load_from_disk
 
@@ -46,15 +47,13 @@ TEXT_DATASET_DIR = os.path.join(BASE_DIR, "data", "processed", "hf_dataset")
 CDLI_CAT_CSV = os.path.join(BASE_DIR, "data", "raw", "cdli_data", "cdli_cat.csv")
 
 
-def load_cdli_cat_meta():
+def load_cdli_cat_meta() -> dict[str, dict]:
     """Fallback metadata source for tablets whose text was ALREADY in the
     corpus (so they're in split_of) but whose photo was fetched directly
     from CDLI rather than via CuneiML's own JSON export -- load_all_
     candidates() only knows about CuneiML entries with an img_url, so those
-    tablets silently got meta={} -> provenience 'Unknown' (session
-    2026-08-12 bug: found via the Assur/Nimrud "text already exists, photo
-    was missing" backfill, where every single one of ~1200 photos lost its
-    real provenience this way -- CDLI's own catalogue always has it)."""
+    tablets silently got meta={} -> provenience 'Unknown'. CDLI's own
+    catalogue always has it, so read it back from there instead."""
     meta = {}
     with open(CDLI_CAT_CSV, encoding="utf-8") as f:
         for row in csv.DictReader(f):
@@ -64,7 +63,7 @@ def load_cdli_cat_meta():
     return meta
 
 
-def tablet_split_map():
+def tablet_split_map() -> dict[str, str]:
     """tablet_id -> which split (train/validation/test) it belongs to in
     the text dataset, so the vision rows can be assigned consistently."""
     text_ds = load_from_disk(TEXT_DATASET_DIR)
@@ -84,15 +83,15 @@ def tablet_split_map():
     return mapping
 
 
-def bulk_backfill_meta():
+def bulk_backfill_meta() -> dict[str, dict]:
     """tablet_id -> {period, genre, provenience, language} for tablets added
-    by prepare_cdli_bulk.py / the eBL backfill (session 2026-08-12). These
-    aren't in CuneiML's JSON (that's WHY they needed a separate source), so
-    load_all_candidates() below can't supply their metadata -- read it back
-    from the same interim files add_cdli_bulk_documents.py already resolved
-    it into. Also doubles as the id set for the split_for() fallback: only
-    these get it, unlike the ~221 pre-existing CuneiML-photo orphans with no
-    text anywhere, which should stay excluded."""
+    by prepare_cdli_bulk.py / the eBL backfill. These aren't in CuneiML's
+    JSON (that's WHY they needed a separate source), so load_all_candidates()
+    below can't supply their metadata -- read it back from the same interim
+    files add_cdli_bulk_documents.py already resolved it into. Also doubles
+    as the id set for the split_for() fallback: only these get it, unlike
+    the pre-existing CuneiML-photo orphans with no text anywhere, which
+    should stay excluded."""
     meta = {}
     for fname in ("cdli_bulk_documents.jsonl", "ebl_bulk_documents.jsonl", "balance_documents.jsonl",
                   "text_balance_documents.jsonl", "showcase_documents.jsonl",
@@ -107,7 +106,7 @@ def bulk_backfill_meta():
     return meta
 
 
-def main():
+def main() -> None:
     candidates = load_all_candidates()
     split_of = tablet_split_map()
     bulk_meta = bulk_backfill_meta()

@@ -2,9 +2,9 @@
 tablet (concatenated text of all its surviving lines, in original face/line
 order) instead of one row per line. Built to pair naturally with the vision
 config (one photo per tablet already) without the line-repetition frequency
-skew a line-level dataset has (session finding, 2026-08-06) -- and closer to
-Aeneas's own design, where geographic/date attribution use the whole
-inscription's embedding, not a per-line one.
+skew a line-level dataset has, and closer to Aeneas's own design, where
+geographic/date attribution use the whole inscription's embedding, not a
+per-line one.
 
 Source: data/processed/combined_unique.jsonl (written by
 prepare_hf_dataset.py's main() -- the deduplicated, pre-split line pool,
@@ -53,7 +53,7 @@ TEST_JSONL_PATH = os.path.join(BASE_DIR, "data", "processed", "test.jsonl")
 OUT_DIR = os.path.join(BASE_DIR, "data", "processed", "hf_dataset_documents")
 
 
-def tablet_split_map():
+def tablet_split_map() -> dict[str, str]:
     # prepare_hf_dataset.py's own hf_dataset DatasetDict only ever holds
     # train/validation -- its test split is written separately to
     # test.jsonl (untokenized, with pre-mapped label fields "for easy eval
@@ -73,7 +73,7 @@ def tablet_split_map():
     return mapping
 
 
-def main():
+def main() -> None:
     split_of = tablet_split_map()
 
     # Group preserving file order == original face/line order (see docstring).

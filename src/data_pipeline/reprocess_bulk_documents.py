@@ -1,10 +1,9 @@
-"""Redo this session's three bulk-backfill sources (CDLI-bulk-ATF Uruk/
-Nimrud rescue, eBL rescue, balance backfill) through CuneiML's own ATF
-parser (src/data_pipeline/cuneiform_unicode.py) instead of the ad-hoc
+"""Redo the three bulk-backfill sources (CDLI-bulk-ATF Uruk/Nimrud rescue,
+eBL rescue, balance backfill) through CuneiML's own ATF parser
+(src/data_pipeline/cuneiform_unicode.py) instead of the ad-hoc
 line-stripping used when they were first built -- gets a real 'signs'
 (Unicode cuneiform) column matching the rest of the corpus, not an empty
-one, and reports the sign-resolution miss rate for QA (session 2026-08-12,
-user asked to unify signs+transliteration and verify these lines properly).
+one, and reports the sign-resolution miss rate for QA.
 
 Also re-checks every new line against the MAIN corpus's own dedup key
 (joined sign-string, same as prepare_hf_dataset.py's load_and_deduplicate_v2)
@@ -37,7 +36,7 @@ COMBINED_PATH = os.path.join(BASE_DIR, "data", "processed", "combined_unique.jso
 SOURCES = ["cdli_bulk_documents.jsonl", "ebl_bulk_documents.jsonl", "balance_documents.jsonl"]
 
 
-def load_existing_sign_keys():
+def load_existing_sign_keys() -> set[str]:
     keys = set()
     with open(COMBINED_PATH, encoding="utf-8") as f:
         for line in f:
@@ -52,7 +51,7 @@ def load_existing_sign_keys():
     return keys
 
 
-def build_atf_body_index():
+def build_atf_body_index() -> dict[str, str]:
     content = open(ATF_PATH, encoding="utf-8", errors="replace").read()
     chunks = re.split(r"(?m)^&(P\d{6})", content)
     idx = {}
@@ -61,7 +60,7 @@ def build_atf_body_index():
     return idx
 
 
-def build_ebl_atf_index():
+def build_ebl_atf_index() -> dict[str, str]:
     frags = json.load(open(EBL_PATH, encoding="utf-8"))
     idx = {}
     for f in frags:
@@ -71,7 +70,7 @@ def build_ebl_atf_index():
     return idx
 
 
-def main():
+def main() -> None:
     atf_idx = build_atf_body_index()
     ebl_idx = build_ebl_atf_index()
     existing_keys = load_existing_sign_keys()
@@ -138,8 +137,7 @@ def main():
                 # split was manually forced outside that scheme (P387407,
                 # a showcase-adjacent example forced into "test"), where
                 # recomputing would silently move it back to whatever the
-                # hash says (found this session: it landed back in
-                # "train").
+                # hash says instead (confirmed: it lands in "train").
                 "split": old.get("split") or split_for(tid),
             })
             n_written += 1

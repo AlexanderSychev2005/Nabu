@@ -4,6 +4,8 @@ import re
 import sys
 import random
 from pathlib import Path
+from typing import Optional
+
 from tqdm import tqdm
 from datasets import Dataset, DatasetDict, Features, Sequence, Value, ClassLabel
 
@@ -19,7 +21,7 @@ _BRACKET_CHARS = "[]⸢⸣()<>|"  # editorial uncertainty/restoration brackets a
 _SUBSCRIPT_DIGITS = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
 _ASCII_INDEX_DIGIT_RE = re.compile(r"([a-zŋ])([0-9]+)(?![0-9a-z])")
 
-def _normalize_cuneiml_romanization(text):
+def _normalize_cuneiml_romanization(text: str) -> str:
     """CuneiML and ORACC transliterate the same phonemes with two disjoint
     ASCII/Unicode conventions (measured on 200k lines each: ORACC uses
     Unicode š/Unicode subscripts in ~49%/62% of lines and ASCII 'sz'/
@@ -40,7 +42,7 @@ def _normalize_cuneiml_romanization(text):
     text = text.replace("t,", "ṭ").replace("T,", "Ṭ")
     return text
 
-def clean_transliteration(raw):
+def clean_transliteration(raw: Optional[str]) -> str:
     if not raw:
         return ""
     text = _normalize_cuneiml_romanization(raw)
@@ -68,22 +70,21 @@ def clean_transliteration(raw):
 
 FAKE_GENRE_MARKERS = ('fake (modern)',)
 
-def map_language(l):
+def map_language(l: Optional[str]) -> str:
     if not l: return 'Unknown'
     l = l.lower()
     if 'bilingual' in l or ('sumerian' in l and 'akkadian' in l): return 'Bilingual'
     if 'akkadian' in l or 'assyrian' in l or 'babylonian' in l: return 'Akkadian'
     if 'sumerian' in l: return 'Sumerian'
     if any(x in l for x in ['urartian', 'hittite', 'eblaite', 'elamite', 'old persian', 'ugaritic']): return 'Peripheral/Other'
-    # Added after the same full-catalogue audit as PROVENIENCE_LABELS
-    # (session 2026-08-22) -- small counts individually (dozens-low
-    # hundreds), but all genuinely real, attested ancient Near Eastern
-    # languages that plainly belong in this bucket's own stated scope, not
-    # in 'undetermined'/'uncertain' (which stay Unknown, correctly).
+    # Small counts individually (dozens-low hundreds), but all genuinely
+    # real, attested ancient Near Eastern languages that plainly belong in
+    # this bucket's own stated scope, not in 'undetermined'/'uncertain'
+    # (which stay Unknown, correctly).
     if any(x in l for x in ['persian', 'aramaic', 'hebrew', 'hurrian']): return 'Peripheral/Other'
     return 'Unknown'
 
-def map_period(p):
+def map_period(p: Optional[str]) -> str:
     if not p: return 'Unknown'
     p = p.lower()
     if 'neo-assyrian' in p or 'neo assyrian' in p: return 'Neo-Assyrian'
@@ -97,7 +98,7 @@ def map_period(p):
     if any(x in p for x in ['seleucid', 'achaemenid', 'hellenistic']): return 'Late Antiquity'
     return 'Unknown'
 
-def map_genre(g):
+def map_genre(g: Optional[str]) -> str:
     if not g: return 'Unknown'
     g = g.lower()
     if g in FAKE_GENRE_MARKERS: return 'Unknown'
@@ -111,7 +112,7 @@ def map_genre(g):
     if 'letter' in g: return 'Letters'
     return 'Unknown'
 
-def map_provenience(p):
+def map_provenience(p: Optional[str]) -> str:
     if not p: return 'Unknown'
     p = p.lower()
     if 'nineveh' in p or 'kuyunjik' in p: return 'Nineveh'
@@ -126,16 +127,13 @@ def map_provenience(p):
     if 'ugarit' in p or 'ras shamra' in p: return 'Ugarit'
     if 'sippar' in p: return 'Sippar'
     if 'nimrud' in p or 'kalhu' in p: return 'Nimrud'
-    # Added after auditing the full 353k-row CDLI catalogue (session
-    # 2026-08-22): these are all major, well-attested single findspots
-    # that the original 12-class list was silently dropping to 'Unknown'
-    # wholesale -- Ḫattusa alone (14.5k catalogue rows) outnumbers several
-    # of the original 12 classes combined. Catalogue counts overstate how
-    # many end up in the actual corpus, though, since most CDLI records
-    # have no recoverable transliteration anywhere in our sources -- only
-    # candidates that cleared >=50 actual documents after text recovery
-    # are kept here (a few catalogue-large sites, e.g. Ašnakkum, Lagash,
-    # Qattara, ended up with single digits to zero and were dropped).
+    # These are all major, well-attested single findspots -- catalogue
+    # counts overstate how many end up in the actual corpus, though, since
+    # most CDLI records have no recoverable transliteration anywhere in
+    # our sources -- only candidates that cleared >=50 actual documents
+    # after text recovery are kept here (a few catalogue-large sites, e.g.
+    # Ašnakkum, Lagash, Qattara, ended up with single digits to zero and
+    # were dropped).
     if 'hattus' in p or 'boğazk' in p or 'bogazk' in p: return 'Hattusa'
     if p.startswith('mari ') or p.startswith('mari(') or p == 'mari' or 'tell hariri' in p: return 'Mari'
     if 'ebla' in p or 'tell mardikh' in p: return 'Ebla'
@@ -179,7 +177,7 @@ PROVENIENCE_LABELS = ['Nineveh', 'Umma', 'Girsu', 'Nippur', 'Puzriš-Dagan', 'Ka
                       'Emar', 'Isin', 'Ešnunna', 'Šaduppum', 'Nerebtum', 'Šuruppak', 'Kisurra',
                       'Adab', 'Huzirina', 'Pī-Kasî', 'Tuttul', 'Amarna', 'Zabalam']
 
-def label_to_idx(label_str, label_list):
+def label_to_idx(label_str: Optional[str], label_list: list[str]) -> int:
     if not label_str or label_str == 'Unknown':
         return -100
     try:
@@ -187,7 +185,7 @@ def label_to_idx(label_str, label_list):
     except ValueError:
         return -100
 
-def load_and_deduplicate_v2(files):
+def load_and_deduplicate_v2(files: list) -> list[dict]:
     print("Loading and deduplicating datasets (v2)...")
 
     # Cross-source dedup: a small number of CuneiML tablets (~1.5% of them)
@@ -246,7 +244,7 @@ def load_and_deduplicate_v2(files):
     print(f"Total unique lines across datasets: {len(unique_lines)}")
     return list(unique_lines.values())
 
-def to_examples(records):
+def to_examples(records: list[dict]) -> list[dict]:
     """Untokenized examples: both 'signs' (cuneiform) and 'text' (cleaned
     transliteration) side by side, plus the 4 metadata labels shared by both
     training pipelines."""
@@ -271,7 +269,7 @@ def to_examples(records):
         })
     return examples
 
-def main():
+def main() -> None:
     base_dir = Path(r"C:\Programming\akkadian\data")
     interim_dir = base_dir / "interim"
     processed_dir = base_dir / "processed"

@@ -1,10 +1,10 @@
 """Pull specific tablets out of CDLI's own bulk ATF dump (github.com/cdli-gh/
 data, last updated 2022) that are NOT present in our CuneiML export at all --
 found via cdli_cat.csv's 'photo_up' field, which flags CDLI-hosted photos
-independently of what CuneiML happened to bundle (session 2026-08-11: 1486
-Uruk + 642 Nimrud + 8 Ugarit candidates have a photo per CDLI's own catalogue
-but zero overlap with CuneiML; only a fraction of those also have a
-transliteration in the 2022 ATF dump).
+independently of what CuneiML happened to bundle (targets.json: Uruk/Nimrud/
+Ugarit candidates that have a photo per CDLI's own catalogue but zero
+overlap with CuneiML; only a fraction of those also have a transliteration
+in the 2022 ATF dump).
 
 Does NOT touch data/processed/hf_dataset or re-run prepare_hf_dataset.py's
 main() -- that reshuffles the ENTIRE train/val/test split (random.shuffle
@@ -43,7 +43,7 @@ _LINE_RE = re.compile(r"^\s*[0-9]+'*\.\s*(.*)$")
 _SKIP_PREFIXES = ("@", "#", "$", ">>", "=")
 
 
-def split_for(tablet_id):
+def split_for(tablet_id: str) -> str:
     """Deterministic, independent of the main pipeline's random split --
     doesn't touch or depend on any existing tablet's assignment."""
     h = int(hashlib.sha256(tablet_id.encode("utf-8")).hexdigest(), 16) % 20
@@ -54,7 +54,7 @@ def split_for(tablet_id):
     return "train"
 
 
-def parse_atf_body(body):
+def parse_atf_body(body: str) -> list[str]:
     lines = []
     for raw_line in body.splitlines():
         line = raw_line.strip()
@@ -69,7 +69,7 @@ def parse_atf_body(body):
     return lines
 
 
-def main():
+def main() -> None:
     targets = json.load(open(TARGETS_PATH, encoding="utf-8"))
     want_ids = set()
     for ids in targets.values():

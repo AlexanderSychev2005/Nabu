@@ -28,6 +28,7 @@ import json
 import os
 import tkinter as tk
 from tkinter import ttk
+from typing import Optional
 
 from PIL import Image, ImageTk
 
@@ -39,7 +40,7 @@ CORRECTIONS_FILE = os.path.join(BASE_DIR, "data", "bbox_corrections.jsonl")
 MAX_DISPLAY = 850  # canvas fits inside this many px on the longer side
 
 
-def build_path_index():
+def build_path_index() -> dict[str, str]:
     """id -> a filesystem path holding that id's image (any one copy)."""
     index = {}
     if os.path.isdir(FULL_IMG_DIR):
@@ -53,7 +54,7 @@ def build_path_index():
     return index
 
 
-def load_manifest():
+def load_manifest() -> list[dict]:
     items = []
     with open(MANIFEST_FILE, encoding="utf-8") as f:
         for line in f:
@@ -65,7 +66,7 @@ def load_manifest():
 
 
 class ReviewApp:
-    def __init__(self, root, items, done_ids, path_index):
+    def __init__(self, root: tk.Tk, items: list[dict], done_ids: set[str], path_index: dict[str, str]) -> None:
         self.root = root
         self.path_index = path_index
         self.items = [it for it in items if str(it["id"]) not in done_ids]
@@ -103,10 +104,10 @@ class ReviewApp:
 
         self.load_current()
 
-    def current_item(self):
+    def current_item(self) -> dict:
         return self.items[self.idx]
 
-    def load_current(self):
+    def load_current(self) -> None:
         if self.idx >= len(self.items):
             self.status_label.config(text="All done!")
             self.canvas.delete("all")
@@ -145,10 +146,10 @@ class ReviewApp:
             text=f"{done_so_far}/{self.total_all}  |  id={pid}  |  {hint}, red=existing, green=yours"
         )
 
-    def on_press(self, event):
+    def on_press(self, event: tk.Event) -> None:
         self.drag_start = (event.x, event.y)
 
-    def on_drag(self, event):
+    def on_drag(self, event: tk.Event) -> None:
         if self.drag_start is None:
             return
         if self.rect_id is not None:
@@ -156,7 +157,7 @@ class ReviewApp:
         x0, y0 = self.drag_start
         self.rect_id = self.canvas.create_rectangle(x0, y0, event.x, event.y, outline="lime", width=3)
 
-    def on_release(self, event):
+    def on_release(self, event: tk.Event) -> None:
         if self.drag_start is None:
             return
         x0, y0 = self.drag_start
@@ -164,11 +165,11 @@ class ReviewApp:
         self.current_box_canvas = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
         self.drag_start = None
 
-    def _write(self, pid, bbox, status):
+    def _write(self, pid: str, bbox: Optional[list], status: str) -> None:
         self.corrections_f.write(json.dumps({"id": pid, "bbox": bbox, "status": status}) + "\n")
         self.corrections_f.flush()
 
-    def save_current(self):
+    def save_current(self) -> None:
         if self.current_box_canvas is None:
             self.status_label.config(text="No box yet -- drag to draw one, or use 'No tablet visible'.")
             return
@@ -178,21 +179,21 @@ class ReviewApp:
         self._write(pid, bbox, "ok")
         self.advance()
 
-    def mark_bad(self):
+    def mark_bad(self) -> None:
         pid = str(self.current_item()["id"])
         self._write(pid, None, "no_tablet")
         self.advance()
 
-    def skip(self):
+    def skip(self) -> None:
         self.advance()
 
-    def advance(self):
+    def advance(self) -> None:
         self.idx += 1
         self.drag_start = None
         self.load_current()
 
 
-def main():
+def main() -> None:
     items = load_manifest()
     path_index = build_path_index()
     manifest_ids = {str(it["id"]) for it in items}

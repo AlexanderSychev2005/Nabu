@@ -4,6 +4,7 @@ import urllib.request
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
+from typing import Any
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 JSON_FILE = os.path.join(BASE_DIR, "data", "raw", "cuneiml", "CuneiMLv1.2.json")
@@ -13,7 +14,7 @@ LINEART_DIR = os.path.join(BASE_DIR, "data", "raw", "cuneiml", "linearts")
 os.makedirs(IMG_DIR, exist_ok=True)
 os.makedirs(LINEART_DIR, exist_ok=True)
 
-def download_file(url, filepath):
+def download_file(url: str, filepath: str) -> bool:
     if not url:
         return False
     if os.path.exists(filepath):
@@ -24,10 +25,10 @@ def download_file(url, filepath):
             with open(filepath, 'wb') as f:
                 f.write(response.read())
         return True
-    except Exception as e:
+    except Exception:
         return False
 
-def process_item(item):
+def process_item(item: dict[str, Any]) -> int:
     item_id = item.get("id")
     if not item_id:
         return 0
@@ -50,7 +51,7 @@ def process_item(item):
             
     return count
 
-def main():
+def main() -> None:
     print(f"Loading {JSON_FILE}...")
     with open(JSON_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)

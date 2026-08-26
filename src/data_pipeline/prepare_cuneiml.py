@@ -3,7 +3,7 @@ import json
 import csv
 from tqdm import tqdm
 
-def main():
+def main() -> None:
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     INPUT_FILE = os.path.join(base_dir, "data", "raw", "cuneiml", "CuneiMLv1.2.json")
     CDLI_CAT_CSV = os.path.join(base_dir, "data", "raw", "cdli_data", "cdli_cat.csv")

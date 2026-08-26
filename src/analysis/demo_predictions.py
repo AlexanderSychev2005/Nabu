@@ -34,6 +34,7 @@ import re
 import sys
 import time
 import urllib.request
+from typing import Optional
 
 import torch
 from safetensors.torch import load_file
@@ -60,7 +61,7 @@ SHOWCASE_PATH = os.path.join(BASE_DIR, "data", "interim", "showcase_documents.js
 # back to a live API call for a given tablet_id.
 # ---------------------------------------------------------------------------
 
-def build_cdli_atf_dump_index():
+def build_cdli_atf_dump_index() -> dict[str, str]:
     if not os.path.exists(CDLI_ATF_DUMP_PATH):
         return {}
     content = open(CDLI_ATF_DUMP_PATH, encoding="utf-8", errors="replace").read()
@@ -71,12 +72,12 @@ def build_cdli_atf_dump_index():
     return idx
 
 
-def build_ebl_local_index():
+def build_ebl_local_index() -> tuple[dict[str, dict], dict[str, dict]]:
     """(by_cdli, by_id): eBL fragments keyed by their CDLI cross-reference
     (for P###### tablet_ids whose actual transliteration source is eBL, not
-    CDLI -- true for most literary/library fragments, see session notes on
-    K.3375) and by eBL's own fragment id (for "ebl:<id>" tablet_ids, the
-    convention add_showcase_texts.py uses when no CDLI number exists)."""
+    CDLI -- true for most literary/library fragments) and by eBL's own
+    fragment id (for "ebl:<id>" tablet_ids, the convention
+    add_showcase_texts.py uses when no CDLI number exists)."""
     if not os.path.exists(EBL_LOCAL_PATH):
         return {}, {}
     frags = json.load(open(EBL_LOCAL_PATH, encoding="utf-8"))
@@ -91,7 +92,7 @@ def build_ebl_local_index():
     return by_cdli, by_id
 
 
-def load_showcase_work_map():
+def load_showcase_work_map() -> dict[str, str]:
     if not os.path.exists(SHOWCASE_PATH):
         return {}
     out = {}
@@ -107,20 +108,20 @@ def load_showcase_work_map():
 # Record cache (disk) -- one live network call per new tablet_id, ever.
 # ---------------------------------------------------------------------------
 
-def load_record_cache():
+def load_record_cache() -> dict:
     if os.path.exists(RECORD_CACHE_PATH):
         with open(RECORD_CACHE_PATH, encoding="utf-8") as f:
             return json.load(f)
     return {}
 
 
-def save_record_cache(cache):
+def save_record_cache(cache: dict) -> None:
     os.makedirs(os.path.dirname(RECORD_CACHE_PATH), exist_ok=True)
     with open(RECORD_CACHE_PATH, "w", encoding="utf-8") as f:
         json.dump(cache, f, ensure_ascii=False, indent=2)
 
 
-def fetch_cdli_json(numeric_id):
+def fetch_cdli_json(numeric_id: str) -> dict:
     req = urllib.request.Request(
         f"https://cdli.earth/artifacts/{numeric_id}",
         headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
@@ -130,7 +131,7 @@ def fetch_cdli_json(numeric_id):
     return data[0] if isinstance(data, list) else data
 
 
-def fetch_ebl_json(museum_number):
+def fetch_ebl_json(museum_number: str) -> Optional[dict]:
     for base in ("https://www.ebl.lmu.de/api/fragments/", "https://www.ebl.uni-muenchen.de/api/fragments/"):
         try:
             req = urllib.request.Request(base + museum_number, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
@@ -141,7 +142,7 @@ def fetch_ebl_json(museum_number):
     return None
 
 
-def describe_from_cdli(rec):
+def describe_from_cdli(rec: dict) -> Optional[str]:
     parts = []
     if rec.get("designation"):
         parts.append(rec["designation"])
@@ -170,7 +171,7 @@ def describe_from_cdli(rec):
     return " -- ".join(parts) if parts else None
 
 
-def describe_from_ebl(frag, work=None):
+def describe_from_ebl(frag: dict, work: Optional[str] = None) -> Optional[str]:
     parts = []
     if work:
         parts.append(f"{work} fragment")
@@ -190,7 +191,7 @@ def describe_from_ebl(frag, work=None):
     return " -- ".join(parts) if parts else None
 
 
-def parse_translations_by_line(raw_atf):
+def parse_translations_by_line(raw_atf: str) -> dict[tuple[str, str], str]:
     """(face, line_num) -> English translation, from #tr.en: comment lines
     immediately following the numbered content line they annotate. Mirrors
     atf_to_lines's own face-tracking/line-number rules exactly so its output
@@ -222,7 +223,7 @@ def parse_translations_by_line(raw_atf):
     return translations
 
 
-def build_line_table(raw_atf):
+def build_line_table(raw_atf: str) -> list[dict]:
     """[{'face','num','signs','translit','translation'}, ...] -- a real
     per-line parse (not this project's own flattened, whole-document
     'text'/'signs' columns, which lose line boundaries in the corpus merge).
@@ -254,7 +255,10 @@ def build_line_table(raw_atf):
     return [by_key[k] for k in order]
 
 
-def fetch_record(tablet_id, cache, cdli_dump_idx, ebl_by_cdli, ebl_by_id, work_map):
+def fetch_record(
+    tablet_id: str, cache: dict, cdli_dump_idx: dict[str, str],
+    ebl_by_cdli: dict[str, dict], ebl_by_id: dict[str, dict], work_map: dict[str, str],
+) -> dict:
     """{'description': str|None, 'lines': [...]} -- eBL preferred when it has
     this tablet (richer genre/script metadata, and it's the actual
     transliteration source for most literary fragments in this corpus);
@@ -300,7 +304,7 @@ def fetch_record(tablet_id, cache, cdli_dump_idx, ebl_by_cdli, ebl_by_id, work_m
     return result
 
 
-def load_model(checkpoint, model_name, num_labels, use_image, vision_init):
+def load_model(checkpoint: str, model_name: str, num_labels: dict[str, int], use_image: bool, vision_init: str) -> MBertMultiTask:
     model = MBertMultiTask(model_name, num_period=num_labels["period"], num_genre=num_labels["genre"],
                             num_language=num_labels["language"], num_provenience=num_labels["provenience"],
                             use_image=use_image, vision_init=vision_init)
@@ -310,20 +314,20 @@ def load_model(checkpoint, model_name, num_labels, use_image, vision_init):
     return model
 
 
-def mask_positions(input_ids, banned_ids, mlm_probability, rng):
+def mask_positions(input_ids: list[int], banned_ids: set[int], mlm_probability: float, rng: random.Random) -> list[int]:
     eligible = [i for i, t in enumerate(input_ids) if t not in banned_ids]
     n_mask = max(1, round(len(eligible) * mlm_probability))
     return sorted(rng.sample(eligible, min(n_mask, len(eligible))))
 
 
-def topk_at(logits, position, banned, tokenizer, k=3):
+def topk_at(logits: torch.Tensor, position: int, banned: set[int], tokenizer, k: int = 3) -> list[str]:
     row = logits[0, position].clone()
     row[list(banned)] = float("-inf")
     top = torch.topk(row, k=k).indices.tolist()
     return [tokenizer.convert_ids_to_tokens([t])[0] for t in top]
 
 
-def format_metadata_table(label_configs, truth, text_pred, vision_pred):
+def format_metadata_table(label_configs: dict, truth: dict, text_pred: dict, vision_pred: dict) -> str:
     lines = ["| head | ground truth | text-only prediction | vision prediction |", "|---|---|---|---|"]
     for task in TASKS:
         names = label_configs[task]["labels"]
@@ -337,7 +341,9 @@ def format_metadata_table(label_configs, truth, text_pred, vision_pred):
     return "\n".join(lines)
 
 
-def format_side_by_side(safe_id, tablet_id, has_crop, has_full, line_rows):
+def format_side_by_side(
+    safe_id: str, tablet_id: str, has_crop: bool, has_full: bool, line_rows: list[dict],
+) -> Optional[str]:
     """Raw HTML (not a markdown table nested in one) -- photo(s) on the
     left, a real per-line cuneiform/transliteration/translation table on the
     right, so it renders identically everywhere without depending on a
@@ -369,7 +375,7 @@ def format_side_by_side(safe_id, tablet_id, has_crop, has_full, line_rows):
     )
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--text_checkpoint", type=str, default=r"C:\Programming\akkadian\checkpoints_final_text\final_model")
     parser.add_argument("--vision_checkpoint", type=str, default=r"C:\Programming\akkadian\checkpoints_final_vision\final_model")

@@ -23,7 +23,7 @@ CORRECTIONS_FILE = os.path.join(BASE_DIR, "data", "bbox_corrections.jsonl")
 OUT_CSV = os.path.join(BASE_DIR, "data", "vision_dataset_final", "bboxes.csv")
 
 
-def main():
+def main() -> None:
     manifest_ids = set()
     with open(MANIFEST_FILE, encoding="utf-8") as f:
         for line in f:

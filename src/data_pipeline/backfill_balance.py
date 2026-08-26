@@ -1,11 +1,11 @@
-"""Balance backfill (session 2026-08-12): bring under-represented provenience
-classes up toward the current top tier (~650 images, matching Umma/Kanesh/
-Nippur) using the same CDLI-catalog-photo_up + (ATF dump | eBL) text
-cross-reference already used for the Uruk/Nimrud rescue. Per-class caps below
-were computed from that cross-reference and confirmed with the user before
-running -- NOT "grab everything available" (Nineveh alone has 14k+
-candidates; downloading and hand-annotating bboxes for all of them isn't
-feasible for a thesis timeline).
+"""Balance backfill: bring under-represented provenience classes up toward
+the current top tier (~650 images, matching Umma/Kanesh/Nippur) using the
+same CDLI-catalog-photo_up + (ATF dump | eBL) text cross-reference already
+used for the Uruk/Nimrud rescue. Per-class caps below were computed from
+that cross-reference and confirmed with the user before running -- NOT
+"grab everything available" (Nineveh alone has 14k+ candidates;
+downloading and hand-annotating bboxes for all of them isn't feasible for
+a thesis timeline).
 
 Writes data/interim/balance_documents.jsonl (text, same schema as
 prepare_cdli_bulk.py's output) and downloads the matching photos into
@@ -37,8 +37,7 @@ VISION_BASE = os.path.join(BASE_DIR, "data", "vision_dataset", "provenience")
 MANIFEST = os.path.join(BASE_DIR, "data", "vision_dataset", "manifest.jsonl")
 OUT_DOCS = os.path.join(BASE_DIR, "data", "interim", "balance_documents.jsonl")
 
-# Confirmed with the user (session 2026-08-12): target ~650, capped by real
-# availability with text.
+# Confirmed with the user: target ~650, capped by real availability with text.
 CAPS = {
     "Nineveh": 242,
     "Puzriš-Dagan": 257,
@@ -50,7 +49,7 @@ CAPS = {
 }
 
 
-def already_have_pids():
+def already_have_pids() -> set[str]:
     have = set()
     data = json.load(open(JSON_FILE, encoding="utf-8"))
     have |= {str(it["id"]) for it in data if it.get("img_url")}
@@ -62,7 +61,7 @@ def already_have_pids():
     return have
 
 
-def build_atf_text_index():
+def build_atf_text_index() -> dict[str, str]:
     content = open(ATF_PATH, encoding="utf-8", errors="replace").read()
     chunks = re.split(r"(?m)^&(P\d{6})", content)
     idx = {}
@@ -71,7 +70,7 @@ def build_atf_text_index():
     return idx
 
 
-def build_ebl_text_index():
+def build_ebl_text_index() -> dict[str, str]:
     frags = json.load(open(EBL_PATH, encoding="utf-8"))
     idx = {}
     for f in frags:
@@ -81,7 +80,7 @@ def build_ebl_text_index():
     return idx
 
 
-def fetch_photo(pid_numeric, tablet_id, cls):
+def fetch_photo(pid_numeric: str, tablet_id: str, cls: str) -> tuple[str, str]:
     out_dir = os.path.join(VISION_BASE, cls)
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"{pid_numeric}.jpg")
@@ -103,7 +102,7 @@ def fetch_photo(pid_numeric, tablet_id, cls):
     return pid_numeric, f"fail: {last}"
 
 
-def main():
+def main() -> None:
     have = already_have_pids()
     print(f"already have {len(have)} pids across all sources")
 

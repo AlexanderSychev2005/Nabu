@@ -4,10 +4,10 @@ any existing tablet's split assignment (see prepare_cdli_bulk.py's docstring
 for why the split field it assigned is used as-is here rather than re-
 running prepare_hf_dataset.py's random 90/5/5 split over everything) --
 *except* when a backfill tablet_id turns out to already be present in the
-base corpus under a different split (session 2026-08-23 finding: 27 such
-collisions, mostly ORACC's own edition of a tablet plus our own showcase/
-backfill pull of the same physical tablet under a different sign-string,
-so the sign-level dedup elsewhere never catches it). For those, the base
+base corpus under a different split (mostly ORACC's own edition of a
+tablet plus our own showcase/backfill pull of the same physical tablet
+under a different sign-string, so the sign-level dedup elsewhere never
+catches it). For those, the base
 copy is dropped and the backfill's own split wins -- required for
 showcase_documents.jsonl specifically, whose whole point is a tablet held
 out of training; leaving the base copy in train while the showcase copy
@@ -40,7 +40,7 @@ IN_PATHS = [
 DOCS_DIR = os.path.join(BASE_DIR, "data", "processed", "hf_dataset_documents")
 
 
-def main():
+def main() -> None:
     rows = {"train": [], "validation": [], "test": []}
     seen_tablet_ids = set()
     for in_path in IN_PATHS:
@@ -82,10 +82,10 @@ def main():
         addition = Dataset.from_list(new_rows, features=ds[split].features)
         ds[split] = concatenate_datasets([ds[split], addition])
 
-    # A document with empty transliteration (found this session: 1,189
-    # rows, overwhelmingly ORACC lexical/sign-list projects that have real
-    # 'signs' but never had a running transliteration line to begin with)
-    # contributes nothing to MLM restoration and gives the metadata heads
+    # A document with empty transliteration (overwhelmingly ORACC lexical/
+    # sign-list projects that have real 'signs' but never had a running
+    # transliteration line to begin with) contributes nothing to MLM
+    # restoration and gives the metadata heads
     # a classification target with no textual evidence behind it --
     # strictly noise, not a smaller-but-real example.
     n_empty = 0

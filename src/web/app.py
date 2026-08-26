@@ -73,7 +73,7 @@ class AnalyzeRequest(BaseModel):
     restore: bool = True
 
 
-def load_resources():
+def load_resources() -> None:
     global tokenizer, model, label_configs, banned_ids
     global doc_embeddings, doc_ids, doc_meta_by_id
 
@@ -116,11 +116,11 @@ load_resources()
 
 
 @app.get("/")
-def index():
+def index() -> FileResponse:
     return FileResponse(Path(__file__).parent / "static" / "index.html")
 
 
-def _predict_head(out, task):
+def _predict_head(out: dict, task: str) -> dict:
     probs = torch.softmax(out[f"{task}_logits"][0], dim=-1).detach()
     conf, idx = probs.max(dim=-1)
     names = label_configs[task]["labels"]
@@ -132,7 +132,7 @@ def _predict_head(out, task):
 
 
 @app.post("/api/analyze")
-def analyze(req: AnalyzeRequest):
+def analyze(req: AnalyzeRequest) -> dict:
     rng = random.Random(req.seed)
     # clean_transliteration strips [](){}<>| (editorial brackets, ATF sign
     # separators) from the whole string -- protect a literal "[MASK]" (a

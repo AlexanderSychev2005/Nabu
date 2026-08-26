@@ -1,7 +1,7 @@
 """Pull well-known named works (Gilgamesh, Enuma Elish, Atrahasis, Hammurabi's
 code) from eBL into the corpus, forced into the TEST split regardless of
-prepare_cdli_bulk.py's normal hash-based assignment (session 2026-08-12):
-these exist specifically as recognizable qualitative-demo examples for the
+prepare_cdli_bulk.py's normal hash-based assignment: these exist
+specifically as recognizable qualitative-demo examples for the
 thesis/paper, so they must be held out of training -- a model that
 memorized Gilgamesh during training and then "restores" it on a masked-
 span demo isn't demonstrating anything.
@@ -42,7 +42,7 @@ WORKS = {
 }
 
 
-def load_existing_sign_keys():
+def load_existing_sign_keys() -> set[str]:
     keys = set()
     with open(COMBINED_PATH, encoding="utf-8") as f:
         for line in f:
@@ -56,7 +56,7 @@ def load_existing_sign_keys():
     return keys
 
 
-def main():
+def main() -> None:
     frags = json.load(open(EBL_PATH, encoding="utf-8"))
     cdli_meta = {}
     with open(CDLI_CAT_CSV, encoding="utf-8") as f:

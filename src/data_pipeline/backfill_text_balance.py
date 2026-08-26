@@ -1,12 +1,12 @@
-"""Text-only balance backfill (session 2026-08-12): bring under-represented
-period/genre/language classes up toward a mid-tier target, using the same
-CDLI-catalog metadata + (ATF dump | eBL) text cross-reference as
-backfill_balance.py did for provenience -- but no images needed here, so no
-manual bbox review gate. Goes straight through the same verified path as
-reprocess_bulk_documents.py: CuneiML's own ATF->Unicode-sign parser, dedup
-against the main corpus's sign-string keys, clean_transliteration for text.
+"""Text-only balance backfill: bring under-represented period/genre/language
+classes up toward a mid-tier target, using the same CDLI-catalog metadata +
+(ATF dump | eBL) text cross-reference as backfill_balance.py did for
+provenience -- but no images needed here, so no manual bbox review gate.
+Goes straight through the same verified path as reprocess_bulk_documents.py:
+CuneiML's own ATF->Unicode-sign parser, dedup against the main corpus's
+sign-string keys, clean_transliteration for text.
 
-Per-class caps confirmed with the user (session 2026-08-12).
+Per-class caps confirmed with the user.
 
 Writes data/interim/text_balance_documents.jsonl, same schema as the other
 bulk-backfill interim files, ready for add_cdli_bulk_documents.py.
@@ -40,7 +40,7 @@ CAPS = {
 MAPPERS = {"period": map_period, "genre": map_genre, "language": map_language}
 
 
-def already_have_ids():
+def already_have_ids() -> set[str]:
     have = set()
     for fname in os.listdir(os.path.join(BASE_DIR, "data", "interim")):
         if fname.endswith("_documents.jsonl"):
@@ -61,7 +61,7 @@ def already_have_ids():
     return have
 
 
-def load_existing_sign_keys():
+def load_existing_sign_keys() -> set[str]:
     keys = set()
     with open(COMBINED_PATH, encoding="utf-8") as f:
         for line in f:
@@ -75,13 +75,13 @@ def load_existing_sign_keys():
     return keys
 
 
-def build_atf_body_index():
+def build_atf_body_index() -> dict[str, str]:
     content = open(ATF_PATH, encoding="utf-8", errors="replace").read()
     chunks = re.split(r"(?m)^&(P\d{6})", content)
     return {chunks[i]: (chunks[i + 1] if i + 1 < len(chunks) else "") for i in range(1, len(chunks), 2)}
 
 
-def build_ebl_atf_index():
+def build_ebl_atf_index() -> dict[str, str]:
     frags = json.load(open(EBL_PATH, encoding="utf-8"))
     idx = {}
     for f in frags:
@@ -91,7 +91,7 @@ def build_ebl_atf_index():
     return idx
 
 
-def parse_tablet(tid, body, existing_keys):
+def parse_tablet(tid: str, body: str, existing_keys: set[str]) -> tuple[str, list[str], int, int]:
     parsed, misses, tok = atf_to_lines(body)
     tablet_signs, tablet_texts = [], []
     for ln in parsed:
@@ -110,7 +110,7 @@ def parse_tablet(tid, body, existing_keys):
     return text, tablet_signs, sum(misses.values()), tok
 
 
-def main():
+def main() -> None:
     have = already_have_ids()
     print(f"already have {len(have)} tablet ids across the corpus")
 
