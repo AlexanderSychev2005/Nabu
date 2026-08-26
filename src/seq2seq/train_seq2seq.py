@@ -13,10 +13,22 @@ One shared character vocabulary covers both source and target text (T5 ties
 one vocab_size across encoder input and decoder input/output) -- simplest
 correct setup for a from-scratch model at this scale, not a design that
 needs the two languages to share meaning, just alphabet.
+
+Checkpointing/logging follows the same convention as train_mbert.py: a
+timestamped training_log_*.txt (file + stdout) under --out_dir, and periodic
+checkpoints -- except here selection is by held-out validation loss (this
+loop has no HF Trainer to hand that logic to), keeping only the best
+--keep_best of them on disk (each is a full copy, not worth accumulating
+one per save_every) plus a final best/ copy once training ends. A step
+saved because it was competitive at the time can later be pruned if a
+later, better step displaces it -- last-step-wins is not assumed correct.
 """
 import argparse
+import json
+import logging
 import os
 import random
+import shutil
 import time
 
 import torch
@@ -79,6 +91,34 @@ def collate(batch: list[tuple[list[int], list[int]]], pad_id: int) -> dict[str, 
     return {"input_ids": input_ids, "attention_mask": attn_mask, "labels": labels}
 
 
+def setup_logging(out_dir: str) -> logging.Logger:
+    os.makedirs(out_dir, exist_ok=True)
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler(os.path.join(out_dir, f"training_log_{timestamp}.txt")),
+            logging.StreamHandler(),
+        ],
+    )
+    return logging.getLogger(__name__)
+
+
+@torch.no_grad()
+def evaluate_loss(model: torch.nn.Module, loader: DataLoader, device: str, amp_dtype) -> float:
+    model.eval()
+    total_loss, n_batches = 0.0, 0
+    for batch in loader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        with torch.autocast(device_type="cuda", dtype=amp_dtype, enabled=amp_dtype is not None):
+            out = model(**batch)
+        total_loss += out.loss.item()
+        n_batches += 1
+    model.train()
+    return total_loss / max(n_batches, 1)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", choices=list(TASK_DIRS), required=True)
@@ -90,7 +130,8 @@ def main() -> None:
     parser.add_argument("--num_layers", type=int, default=4)
     parser.add_argument("--num_heads", type=int, default=4)
     parser.add_argument("--out_dir", type=str, default=None)
-    parser.add_argument("--save_every", type=int, default=2000)
+    parser.add_argument("--save_every", type=int, default=2000, help="cadence for both validation eval and checkpoint consideration")
+    parser.add_argument("--keep_best", type=int, default=3, help="how many step_N/ checkpoints to keep on disk, ranked by validation loss")
     parser.add_argument("--warmup_steps", type=int, default=500)
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--bf16", action="store_true", help="mixed precision -- MI300X/A100+ only, skip on older cards")
@@ -98,8 +139,11 @@ def main() -> None:
                          help="HF repo id (default), or a local data/processed/hf_dataset_<task> path")
     args = parser.parse_args()
 
+    out_dir = args.out_dir or os.path.join(BASE_DIR, "checkpoints_seq2seq", args.task)
+    logger = setup_logging(out_dir)
+
     extract = TASK_DIRS[args.task]
-    print(f"Loading '{args.task}' config from {args.data_dir} ...")
+    logger.info(f"Loading '{args.task}' config from {args.data_dir} ...")
     if "/" in args.data_dir and not os.path.exists(args.data_dir):
         ds = load_dataset(args.data_dir, args.task)
     else:
@@ -107,16 +151,20 @@ def main() -> None:
     train_pairs = [extract(r) for r in ds["train"]]
     val_pairs = [extract(r) for r in ds["validation"]]
     random.Random(0).shuffle(train_pairs)
-    print(f"train pairs: {len(train_pairs)}, validation pairs: {len(val_pairs)}")
+    logger.info(f"train pairs: {len(train_pairs)}, validation pairs: {len(val_pairs)}")
 
     vocab = build_vocab([s for s, t in train_pairs] + [t for s, t in train_pairs])
-    print(f"shared char vocab size: {len(vocab)}")
+    logger.info(f"shared char vocab size: {len(vocab)}")
 
     train_ds = PairDataset(train_pairs, vocab, args.max_len)
     loader = DataLoader(
         train_ds, batch_size=args.batch_size, shuffle=True,
         collate_fn=lambda b: collate(b, vocab[PAD]),
         num_workers=args.num_workers, pin_memory=True, persistent_workers=args.num_workers > 0,
+    )
+    val_loader = DataLoader(
+        PairDataset(val_pairs, vocab, args.max_len), batch_size=args.batch_size, shuffle=False,
+        collate_fn=lambda b: collate(b, vocab[PAD]),
     )
 
     config = T5Config(
@@ -126,18 +174,33 @@ def main() -> None:
     )
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = T5ForConditionalGeneration(config).to(device)
-    print(f"model params: {sum(p.numel() for p in model.parameters()) / 1e6:.1f}M, device={device}")
+    logger.info(f"model params: {sum(p.numel() for p in model.parameters()) / 1e6:.1f}M, device={device}")
 
-    import json
+    # Kept checkpoints, sorted ascending by validation loss (best first).
+    # Each entry is (val_loss, step); the matching directory is out_dir/step_N.
+    top_checkpoints: list[tuple[float, int]] = []
 
-    out_dir = args.out_dir or os.path.join(BASE_DIR, "checkpoints_seq2seq", args.task)
-    os.makedirs(out_dir, exist_ok=True)
+    def save_checkpoint(step: int) -> str:
+        ckpt_dir = os.path.join(out_dir, f"step_{step}")
+        os.makedirs(ckpt_dir, exist_ok=True)
+        model.save_pretrained(ckpt_dir)
+        json.dump(vocab, open(os.path.join(ckpt_dir, "vocab.json"), "w", encoding="utf-8"), ensure_ascii=False)
+        json.dump(vars(args), open(os.path.join(ckpt_dir, "train_args.json"), "w"))
+        return ckpt_dir
 
-    def save() -> None:
-        model.save_pretrained(out_dir)
-        json.dump(vocab, open(os.path.join(out_dir, "vocab.json"), "w", encoding="utf-8"), ensure_ascii=False)
-        json.dump(vars(args), open(os.path.join(out_dir, "train_args.json"), "w"))
-        print(f"[checkpoint saved at step {step}] {out_dir}", flush=True)
+    def consider_checkpoint(step: int, val_loss: float) -> None:
+        if len(top_checkpoints) < args.keep_best or val_loss < top_checkpoints[-1][0]:
+            save_checkpoint(step)
+            top_checkpoints.append((val_loss, step))
+            top_checkpoints.sort(key=lambda t: t[0])
+            logger.info(f"[checkpoint saved at step {step}] val_loss={val_loss:.3f} -- {out_dir}/step_{step}")
+            while len(top_checkpoints) > args.keep_best:
+                _, worst_step = top_checkpoints.pop()
+                shutil.rmtree(os.path.join(out_dir, f"step_{worst_step}"), ignore_errors=True)
+                logger.info(f"[pruned step {worst_step}, no longer in top {args.keep_best}]")
+        else:
+            logger.info(f"[step {step}] val_loss={val_loss:.3f} -- not competitive, not saved "
+                        f"(worst kept: {top_checkpoints[-1][0]:.3f})")
 
     optim = torch.optim.AdamW(model.parameters(), lr=args.lr)
     scheduler = get_cosine_schedule_with_warmup(optim, args.warmup_steps, args.max_steps)
@@ -158,14 +221,26 @@ def main() -> None:
             step += 1
             if step % 50 == 0:
                 lr_now = scheduler.get_last_lr()[0]
-                print(f"step {step}/{args.max_steps} loss={out.loss.item():.3f} lr={lr_now:.2e} ({time.time()-t0:.0f}s)", flush=True)
+                logger.info(f"step {step}/{args.max_steps} loss={out.loss.item():.3f} lr={lr_now:.2e} ({time.time()-t0:.0f}s)")
             if step % args.save_every == 0:
-                save()
+                val_loss = evaluate_loss(model, val_loader, device, amp_dtype)
+                logger.info(f"[eval at step {step}] val_loss={val_loss:.3f}")
+                consider_checkpoint(step, val_loss)
             if step >= args.max_steps:
                 break
 
-    save()
-    print(f"Done, saved model + vocab to {out_dir}")
+    if step % args.save_every != 0:
+        val_loss = evaluate_loss(model, val_loader, device, amp_dtype)
+        logger.info(f"[final eval at step {step}] val_loss={val_loss:.3f}")
+        consider_checkpoint(step, val_loss)
+
+    best_loss, best_step = top_checkpoints[0]
+    best_dir = os.path.join(out_dir, "best")
+    if os.path.exists(best_dir):
+        shutil.rmtree(best_dir)
+    shutil.copytree(os.path.join(out_dir, f"step_{best_step}"), best_dir)
+    logger.info(f"Done. Best checkpoint: step {best_step} (val_loss={best_loss:.3f}), copied to {best_dir}")
+    logger.info(f"Kept checkpoints: {[(s, round(l, 3)) for l, s in top_checkpoints]}")
 
 
 if __name__ == "__main__":

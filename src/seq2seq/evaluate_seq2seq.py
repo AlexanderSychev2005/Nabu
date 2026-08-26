@@ -44,7 +44,7 @@ def main() -> None:
                               "'test' ONLY once, for the final reported number -- never to guide choices")
     args = parser.parse_args()
 
-    ckpt = args.checkpoint or os.path.join(BASE_DIR, "checkpoints_seq2seq", args.task)
+    ckpt = args.checkpoint or os.path.join(BASE_DIR, "checkpoints_seq2seq", args.task, "best")
     vocab = json.load(open(os.path.join(ckpt, "vocab.json"), encoding="utf-8"))
     id2char = {i: c for c, i in vocab.items()}
     device = "cuda" if torch.cuda.is_available() else "cpu"
