@@ -5,18 +5,20 @@ from datasets import load_from_disk
 from pathlib import Path
 
 # Local dir name for each pushed config -- documents/vision are the two
-# configs the current pipeline actually trains on (session 2026-08-12);
-# 'default' (line-level) stays as split-assignment infrastructure for
+# configs the current pipeline actually trains on; 'default' (line-level)
+# stays as split-assignment infrastructure for
 # prepare_document_dataset.py/build_vision_hf_dataset.py but isn't itself a
 # training target anymore, so it's included here only if explicitly asked for.
 CONFIG_DIRS = {
     "documents": "hf_dataset_documents_with_cdli_bulk",
     "vision": "hf_dataset_vision",
     "default": "hf_dataset",
+    "signs_translit": "hf_dataset_signs_translit",
+    "translit_english": "hf_dataset_translit_english",
 }
 
 
-def main():
+def main() -> None:
     base_dir = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))) / "data" / "processed"
 
     parser = argparse.ArgumentParser(description="Push a Nabu dataset config to Hugging Face Hub")
