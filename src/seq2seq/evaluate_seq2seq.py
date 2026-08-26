@@ -32,7 +32,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", choices=list(TASK_DIRS), required=True)
     parser.add_argument("--checkpoint", type=str, default=None)
-    parser.add_argument("--n_examples", type=int, default=300)
+    parser.add_argument("--n_examples", type=int, default=None,
+                         help="cap the number evaluated, for a quick dev-time check; omit to use the whole split")
+    parser.add_argument("--eval_batch_size", type=int, default=64)
     parser.add_argument("--max_len", type=int, default=96)
     parser.add_argument("--num_beams", type=int, default=1)
     parser.add_argument("--data_dir", type=str, default=DEFAULT_REPO_ID,
@@ -53,7 +55,9 @@ def main() -> None:
         ds = load_dataset(args.data_dir, args.task)
     else:
         ds = load_from_disk(args.data_dir)
-    pairs = [extract(r) for r in ds[args.split]][: args.n_examples]
+    pairs = [extract(r) for r in ds[args.split]]
+    if args.n_examples is not None:
+        pairs = pairs[: args.n_examples]
 
     def decode(ids: list) -> str:
         out = []
@@ -70,22 +74,35 @@ def main() -> None:
     total_word_edits = total_ref_words = 0
     exact = 0
     shown = 0
-    for src, tgt in pairs:
-        input_ids = torch.tensor([encode(src, vocab, args.max_len)]).to(device)
+    n_batches = (len(pairs) + args.eval_batch_size - 1) // args.eval_batch_size
+    for bi in range(0, len(pairs), args.eval_batch_size):
+        batch = pairs[bi : bi + args.eval_batch_size]
+        srcs = [encode(s, vocab, args.max_len) for s, _ in batch]
+        width = max(len(s) for s in srcs)
+        input_ids = torch.full((len(srcs), width), vocab[PAD], dtype=torch.long)
+        attn_mask = torch.zeros((len(srcs), width), dtype=torch.long)
+        for i, s in enumerate(srcs):
+            input_ids[i, : len(s)] = torch.tensor(s)
+            attn_mask[i, : len(s)] = 1
+        input_ids, attn_mask = input_ids.to(device), attn_mask.to(device)
+
         with torch.no_grad():
-            gen = model.generate(input_ids, max_new_tokens=args.max_len, num_beams=args.num_beams)
-        pred = decode(gen[0].tolist())
+            gen = model.generate(input_ids, attention_mask=attn_mask, max_new_tokens=args.max_len, num_beams=args.num_beams)
 
-        total_char_edits += levenshtein(list(pred), list(tgt))
-        total_ref_chars += max(len(tgt), 1)
-        pred_words, tgt_words = pred.split(), tgt.split()
-        total_word_edits += levenshtein(pred_words, tgt_words)
-        total_ref_words += max(len(tgt_words), 1)
-        exact += int(pred.strip() == tgt.strip())
+        for (src, tgt), ids in zip(batch, gen.tolist()):
+            pred = decode(ids)
+            total_char_edits += levenshtein(list(pred), list(tgt))
+            total_ref_chars += max(len(tgt), 1)
+            pred_words, tgt_words = pred.split(), tgt.split()
+            total_word_edits += levenshtein(pred_words, tgt_words)
+            total_ref_words += max(len(tgt_words), 1)
+            exact += int(pred.strip() == tgt.strip())
+            if shown < 8:
+                print(f"  src:  {src}\n  ref:  {tgt}\n  pred: {pred}\n")
+                shown += 1
 
-        if shown < 8:
-            print(f"  src:  {src}\n  ref:  {tgt}\n  pred: {pred}\n")
-            shown += 1
+        if (bi // args.eval_batch_size + 1) % 20 == 0:
+            print(f"  ...batch {bi // args.eval_batch_size + 1}/{n_batches}", flush=True)
 
     n = len(pairs)
     print(f"split={args.split} n={n}")
