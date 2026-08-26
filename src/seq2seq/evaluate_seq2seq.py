@@ -77,6 +77,8 @@ def main() -> None:
     target_vocab_size = json.load(open(os.path.join(ckpt, "vocab_meta.json")))["target_vocab_size"]
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = T5ForConditionalGeneration.from_pretrained(ckpt).to(device).eval()
+    model.config.use_cache = True  # a checkpoint trained with --grad_checkpointing saved use_cache=False;
+    # that only matters for training, generation always wants the KV cache back for speed.
     total_vocab_size = model.config.vocab_size
 
     # Hard-suppress source-only characters (e.g. cuneiform signs) as

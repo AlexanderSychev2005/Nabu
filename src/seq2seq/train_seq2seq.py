@@ -197,6 +197,9 @@ def main() -> None:
     parser.add_argument("--warmup_steps", type=int, default=500)
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--bf16", action="store_true", help="mixed precision -- MI300X/A100+ only, skip on older cards")
+    parser.add_argument("--grad_checkpointing", action="store_true",
+                         help="trade compute for memory (recomputes activations in backward instead of storing "
+                              "them) -- lets a bigger model/batch fit in the same VRAM, at some speed cost")
     parser.add_argument("--data_dir", type=str, default=DEFAULT_REPO_ID,
                          help="HF repo id (default), or a local data/processed/hf_dataset_<task> path")
     args = parser.parse_args()
@@ -249,7 +252,11 @@ def main() -> None:
     )
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = T5ForConditionalGeneration(config).to(device)
-    logger.info(f"model params: {sum(p.numel() for p in model.parameters()) / 1e6:.1f}M, device={device}")
+    if args.grad_checkpointing:
+        model.gradient_checkpointing_enable()
+        model.config.use_cache = False  # incompatible with checkpointing during training; generate() re-enables it
+    logger.info(f"model params: {sum(p.numel() for p in model.parameters()) / 1e6:.1f}M, device={device}, "
+                f"grad_checkpointing={args.grad_checkpointing}")
 
     # Kept checkpoints, sorted ascending by validation loss (best first).
     # Each entry is (val_loss, step); the matching directory is out_dir/step_N.
