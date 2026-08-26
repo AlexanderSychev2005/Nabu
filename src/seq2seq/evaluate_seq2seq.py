@@ -50,6 +50,14 @@ def main() -> None:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = T5ForConditionalGeneration.from_pretrained(ckpt).to(device).eval()
 
+    # Hard-suppress source-only characters (e.g. cuneiform signs) as
+    # generation candidates -- see build_vocab()'s docstring. Older
+    # checkpoints predate vocab_meta.json; fall back to no suppression
+    # rather than failing to load them.
+    meta_path = os.path.join(ckpt, "vocab_meta.json")
+    target_vocab_size = json.load(open(meta_path))["target_vocab_size"] if os.path.exists(meta_path) else len(vocab)
+    suppress_tokens = list(range(target_vocab_size, len(vocab))) or None
+
     extract = TASK_DIRS[args.task]
     if "/" in args.data_dir and not os.path.exists(args.data_dir):
         ds = load_dataset(args.data_dir, args.task)
@@ -87,7 +95,10 @@ def main() -> None:
         input_ids, attn_mask = input_ids.to(device), attn_mask.to(device)
 
         with torch.no_grad():
-            gen = model.generate(input_ids, attention_mask=attn_mask, max_new_tokens=args.max_len, num_beams=args.num_beams)
+            gen = model.generate(
+                input_ids, attention_mask=attn_mask, max_new_tokens=args.max_len,
+                num_beams=args.num_beams, suppress_tokens=suppress_tokens,
+            )
 
         for (src, tgt), ids in zip(batch, gen.tolist()):
             pred = decode(ids)

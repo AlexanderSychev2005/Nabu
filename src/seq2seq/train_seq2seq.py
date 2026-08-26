@@ -49,12 +49,25 @@ PAD, BOS, EOS, UNK = "<pad>", "<bos>", "<eos>", "<unk>"
 SPECIALS = [PAD, BOS, EOS, UNK]
 
 
-def build_vocab(texts: list[str]) -> dict[str, int]:
-    chars = sorted(set("".join(texts)))
+def build_vocab(target_texts: list[str], source_texts: list[str]) -> tuple[dict[str, int], int]:
+    """Target-alphabet characters get the lowest ids (right after the
+    specials), source-only characters are appended after -- source and
+    target are near-disjoint alphabets here (measured on signs_translit:
+    387 source chars, 81 target chars, only 8 shared), so a shared T5
+    vocab_size otherwise wastes most of the decoder's output softmax on
+    characters (cuneiform signs) that can never be a valid transliteration
+    character. Returns (vocab, target_vocab_size) -- the boundary below
+    which every id is a real candidate output, used to hard-suppress the
+    rest at generation time (see evaluate_seq2seq.py's suppress_tokens)."""
+    target_chars = sorted(set("".join(target_texts)))
+    source_only_chars = sorted(set("".join(source_texts)) - set(target_chars))
     vocab = {tok: i for i, tok in enumerate(SPECIALS)}
-    for c in chars:
+    for c in target_chars:
         vocab[c] = len(vocab)
-    return vocab
+    target_vocab_size = len(vocab)
+    for c in source_only_chars:
+        vocab[c] = len(vocab)
+    return vocab, target_vocab_size
 
 
 def encode(text: str, vocab: dict[str, int], max_len: int) -> list[int]:
@@ -153,8 +166,11 @@ def main() -> None:
     random.Random(0).shuffle(train_pairs)
     logger.info(f"train pairs: {len(train_pairs)}, validation pairs: {len(val_pairs)}")
 
-    vocab = build_vocab([s for s, t in train_pairs] + [t for s, t in train_pairs])
-    logger.info(f"shared char vocab size: {len(vocab)}")
+    vocab, target_vocab_size = build_vocab(
+        target_texts=[t for s, t in train_pairs], source_texts=[s for s, t in train_pairs],
+    )
+    logger.info(f"vocab size: {len(vocab)} ({target_vocab_size} valid outputs, "
+                f"{len(vocab) - target_vocab_size} source-only, suppressed at generation)")
 
     train_ds = PairDataset(train_pairs, vocab, args.max_len)
     loader = DataLoader(
@@ -168,7 +184,7 @@ def main() -> None:
     )
 
     config = T5Config(
-        vocab_size=len(vocab), d_model=args.d_model, d_ff=args.d_model * 2,
+        vocab_size=len(vocab), d_model=args.d_model, d_ff=args.d_model * 4,
         num_layers=args.num_layers, num_heads=args.num_heads,
         decoder_start_token_id=vocab[BOS], pad_token_id=vocab[PAD], eos_token_id=vocab[EOS],
     )
@@ -186,6 +202,7 @@ def main() -> None:
         model.save_pretrained(ckpt_dir)
         json.dump(vocab, open(os.path.join(ckpt_dir, "vocab.json"), "w", encoding="utf-8"), ensure_ascii=False)
         json.dump(vars(args), open(os.path.join(ckpt_dir, "train_args.json"), "w"))
+        json.dump({"target_vocab_size": target_vocab_size}, open(os.path.join(ckpt_dir, "vocab_meta.json"), "w"))
         return ckpt_dir
 
     def consider_checkpoint(step: int, val_loss: float) -> None:
