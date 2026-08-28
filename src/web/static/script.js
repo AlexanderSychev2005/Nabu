@@ -474,7 +474,17 @@ function openDocModal(d) {
     const sourceCaption = d.lines_source
         ? `<p class="line-source">Source: ${d.lines_source_url
             ? `<a href="${d.lines_source_url}" target="_blank" rel="noopener">${d.lines_source} ↗</a>`
-            : d.lines_source}</p>`
+            : d.lines_source}${
+                // Another edition of this same physical tablet exists too
+                // (e.g. CDLI's own transliteration vs. ORACC's) -- shown as
+                // a plain link, not merged into the table above: the two
+                // can genuinely disagree on restoration (see
+                // build_line_tables.py), so cross-checking is left to the
+                // reader rather than us guessing which one to blend in.
+                d.lines_alt_sources && d.lines_alt_sources.length
+                    ? ` · Also see: ${d.lines_alt_sources.map((s) => `<a href="${s.url}" target="_blank" rel="noopener">${s.label} ↗</a>`).join(" · ")}`
+                    : ""
+            }</p>`
         : "";
     const textBlock = (d.lines && d.lines.length)
         ? `<div class="modal-section-label">Line by line</div>${sourceCaption}${renderLineTable(d.lines)}`

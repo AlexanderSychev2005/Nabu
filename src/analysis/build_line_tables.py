@@ -295,21 +295,36 @@ def main() -> None:
 
     # Prefer whichever table actually carries a translation; an ATF table
     # with real cuneiform signs wins on a tie (both or neither translated).
+    # When both a CDLI/eBL AND an ORACC table exist for the same tablet,
+    # the losing one isn't discarded outright -- different scholarly
+    # editions of the same physical tablet can genuinely disagree on
+    # restoration (see build_line_tables.py's module docstring / K.2433),
+    # so the loser is kept as an 'alt_sources' link for a reader who wants
+    # to cross-check, without us trying to merge the two into one table.
     result: dict[str, dict] = {}
-    n_atf = n_oracc = 0
+    n_atf = n_oracc = n_both = 0
     for tid in tablet_ids:
         atf_lines = atf_tables.get(tid)
         oracc_lines = oracc_tables.get(tid)
         atf_has_tr = bool(atf_lines) and any(l["translation"] for l in atf_lines)
         oracc_has_tr = bool(oracc_lines) and any(l["translation"] for l in oracc_lines)
-        if atf_has_tr or (atf_lines and not oracc_has_tr):
-            lines, (label, url), n_atf = atf_lines, atf_source[tid], n_atf + 1
+        used_atf = atf_has_tr or (atf_lines and not oracc_has_tr)
+        if used_atf:
+            lines, (label, url) = atf_lines, atf_source[tid]
+            n_atf += 1
         elif oracc_lines:
-            lines, (label, url), n_oracc = oracc_lines, oracc_source[tid], n_oracc + 1
+            lines, (label, url) = oracc_lines, oracc_source[tid]
+            n_oracc += 1
         else:
             continue
-        result[tid] = {"source": label, "source_url": url, "lines": lines}
-    print(f"  {n_atf} tablets used the CDLI/eBL table, {n_oracc} used the ORACC-HTML table")
+        alt_sources = []
+        if atf_lines and oracc_lines:
+            other_label, other_url = oracc_source[tid] if used_atf else atf_source[tid]
+            if other_url and other_url != url:
+                alt_sources.append({"label": other_label, "url": other_url})
+            n_both += 1
+        result[tid] = {"source": label, "source_url": url, "alt_sources": alt_sources, "lines": lines}
+    print(f"  {n_atf} tablets used the CDLI/eBL table, {n_oracc} used the ORACC-HTML table ({n_both} had both, alt-source link kept for the one not shown)")
 
     print(f"Total: {len(result)}/{len(tablet_ids)} tablets with a line table ({100*len(result)/len(tablet_ids):.1f}%)")
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)

@@ -276,6 +276,7 @@ def analyze(req: AnalyzeRequest) -> dict:
                 "lines": line_table.get("lines"),
                 "lines_source": line_table.get("source"),
                 "lines_source_url": line_table.get("source_url"),
+                "lines_alt_sources": line_table.get("alt_sources"),
             })
 
     return {
