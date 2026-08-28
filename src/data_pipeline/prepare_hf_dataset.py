@@ -17,9 +17,42 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 _DETERMINATIVE_RE = re.compile(r"\{[^}]*\}")  # e.g. {m}, {d}, {ki} -- editorial determinatives, dropped entirely (Lazar et al. 2021 do the same with sub/superscripts)
 _SCRIBAL_ERROR_RE = re.compile(r"<<[^>]*>>")  # ATF: sign(s) an editor considers an erroneous scribal addition -- unlike <x> (accidentally omitted, restored by the editor, real content), <<x>> should be dropped entirely, content included, not just the doubled brackets
-_BRACKET_CHARS = "[]⸢⸣()<>|"  # editorial uncertainty/restoration brackets and ATF sign-separator (|) -- stripped, content kept (single <x> only -- <<x>> is handled separately above, before this runs)
+# ATF inline editorial note (e.g. "$erasure?$", "$copy: TA*$", "$;:GE23$") --
+# ORACC and CDLI both use $-delimited asides for scribal/collation remarks
+# that were never meant to be running transliteration text. Must run before
+# _BRACKET_CHARS strips '$'-adjacent brackets, or a comment glued onto a
+# word survives as stray punctuation once the delimiters are gone.
+_COMMENT_RE = re.compile(r"\$[^$]*\$")
+# Editorial uncertainty/restoration brackets (every Unicode half-bracket
+# variant actually observed in the corpus, not just the canonical ⸢⸣) and
+# ATF's sign-separator (|) -- stripped, content kept (single <x> only --
+# <<x>> is handled separately above, before this runs). '{}' is included
+# here too, not just in _DETERMINATIVE_RE: that regex only removes
+# well-paired {det}s, but ORACC builds 'text' by concatenating each word's
+# own transliteration fragment, and a determinative/language-shift span
+# that (in ORACC's own markup) spans multiple words can lose its matching
+# half in the join -- e.g. "AN } um-ma" for Amarna-letter divine names --
+# leaving an orphaned brace with no partner. A lone {/} is never itself
+# real transliteration content, so stripping any survivor here is safe.
+_BRACKET_CHARS = "[]⸢⸣⌈⌉˹˺(){}<>|"
 _SUBSCRIPT_DIGITS = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
 _ASCII_INDEX_DIGIT_RE = re.compile(r"([a-zŋ])([0-9]+)(?![0-9a-z])")
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")  # stray encoding-artifact control characters (e.g. a lone \x8a) -- never real content
+# ORACC's own "sign present but illegible" placeholder is uppercase X
+# (word-delimited) / U+2093 subscript-x (used for numerals of unknown
+# value); CDLI-bulk's equivalent is lowercase x (see cuneiform_unicode.py's
+# _S_TOKENS). train_mbert.py's mark_damage_signals() only recognizes the
+# lowercase form (LONE_X_RE = r"\bx\b"), so without this normalization an
+# ORACC-sourced 'X' never becomes the [unused1] damage sentinel -- it's
+# ordinary text to the tokenizer, eligible to be an MLM mask *target* even
+# though there is no real answer for what an illegible sign "should" be.
+_STANDALONE_X_RE = re.compile(r"\bX\b")
+# ATF certainty flag ('sign confirmed by collation'), glued directly onto a
+# sign the same way '#'/'?'/'!' are -- those three are already stripped for
+# CDLI-bulk text by cuneiform_unicode.py before it ever reaches here, but
+# that cleaning never runs on ORACC's 'frag' strings, and '*' isn't in that
+# function's own strip list either. Like '#'/'?'/'!', it's never itself a
+# real sign, so an unconditional strip is safe.
 
 def _normalize_cuneiml_romanization(text: str) -> str:
     """CuneiML and ORACC transliterate the same phonemes with two disjoint
@@ -46,15 +79,24 @@ def clean_transliteration(raw: Optional[str]) -> str:
     if not raw:
         return ""
     text = _normalize_cuneiml_romanization(raw)
+    text = _COMMENT_RE.sub("", text)
     text = _DETERMINATIVE_RE.sub("", text)
     text = _SCRIBAL_ERROR_RE.sub("", text)
     text = text.translate(str.maketrans("", "", _BRACKET_CHARS))
-    # Em-dash used as a name/word-joining mark (e.g. 'GAL—MU', 'qur-di—DINGIR-ma') --
-    # not in mBERT's vocab (unlike every other Assyriological diacritic we
-    # checked), so normalize it to the plain hyphen already used for the
-    # same joining role elsewhere in the transliteration.
-    text = text.replace("—", "-")
-    # A dropped {determinative} or <<scribal error>> sitting directly
+    text = _CONTROL_CHAR_RE.sub("", text)
+    text = text.replace("*", "").replace("\\", "")
+    text = _STANDALONE_X_RE.sub("x", text).replace("ₓ", "x")
+    # Em-dash/en-dash/figure-dash used as a name/word-joining mark (e.g.
+    # 'GAL—MU', 'qur-di—DINGIR-ma') -- not in mBERT's vocab (unlike every
+    # other Assyriological diacritic we checked), so normalize every dash
+    # variant to the plain hyphen already used for the same joining role
+    # elsewhere in the transliteration.
+    text = re.sub(r"[—–‒]", "-", text)
+    # Curly apostrophe and the Sumerian ĝ variant: same phoneme as the
+    # straight apostrophe/ŋ already used elsewhere in the corpus -- unify
+    # so the tokenizer doesn't see two unrelated tokens for one sound.
+    text = text.replace("’", "'").replace("ĝ", "ŋ")
+    # A dropped {determinative}/$comment$/<<scribal error>> sitting directly
     # between two hyphens (e.g. "pa-<<da>>-aš" -> "pa--aš") leaves a
     # doubled hyphen once its content is gone -- collapse it so the
     # tokenizer doesn't see a fake empty syllable.

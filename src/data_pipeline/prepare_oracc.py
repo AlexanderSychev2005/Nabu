@@ -23,7 +23,13 @@ def extract_utf8(gdl_list: list[dict], out: list[str]) -> None:
             # token used for genuinely illegible signs.
             extract_utf8(g["group"], out)
         elif "utf8" in g:
-            out.append(g["utf8"])
+            # ORACC's own "illegible sign" placeholder surfaces as uppercase
+            # "X" here (not lowercase "x" as this branch's original comment
+            # assumed) -- normalized to match the lowercase convention
+            # cuneiform_unicode.py's CDLI-bulk path already uses for the
+            # same concept (its _S_TOKENS "x"), so both sources agree on one
+            # spelling for "sign present, illegible" in the signs column.
+            out.append("x" if g["utf8"] == "X" else g["utf8"])
         elif g.get("x") == "ellipsis":
             # An unknown-length gap ("..." in the transliteration) -- unlike
             # a single damaged sign ("x", which has its own utf8=="x" node
