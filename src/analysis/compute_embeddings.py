@@ -35,9 +35,29 @@ from tqdm import tqdm
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.training.train_mbert import MBertMultiTask, mark_damage_signals
-from src.analysis.interpret import document_embedding
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def batched_document_embedding(model, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> np.ndarray:
+    """Same 0.5*([CLS] + mean of the other real tokens) as interpret.py's
+    document_embedding(), vectorized over the batch dimension instead of
+    interpret.py's single-example version (which app.py's live query path
+    keeps using as-is -- this batched variant is only for this script's own
+    corpus-wide pass, where looping one example at a time left the GPU
+    mostly idle between tiny forward passes)."""
+    with torch.no_grad():
+        seq = model.backbone.bert(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
+        mask = attention_mask.bool()
+        cls = seq[:, 0]
+        rest_mask = mask.clone()
+        rest_mask[:, 0] = False
+        rest_mask_f = rest_mask.unsqueeze(-1).float()
+        counts = rest_mask_f.sum(dim=1)
+        mean = (seq * rest_mask_f).sum(dim=1) / counts.clamp(min=1)
+        mean = torch.where(counts > 0, mean, cls)
+        emb = 0.5 * (cls + mean)
+    return emb.detach().cpu().numpy().astype(np.float32)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -49,6 +69,10 @@ if __name__ == "__main__":
     parser.add_argument("--max_length", type=int, default=96)
     parser.add_argument("--context_char_max", type=int, default=768,
                          help="Matches the document-granularity training window (MBertCollator's own default)")
+    parser.add_argument("--batch_size", type=int, default=16,
+                         help="Kept modest on purpose: app.py's own server keeps its copy of this same "
+                              "checkpoint resident on the GPU the whole time it runs, so this script only "
+                              "ever has whatever VRAM that leaves free to work with.")
     parser.add_argument("--out_dir", default=os.path.join(BASE_DIR, "results_final", "embeddings"))
     args = parser.parse_args()
 
@@ -79,22 +103,26 @@ if __name__ == "__main__":
 
     embeddings, meta = [], []
     for split in ds:
-        for row in tqdm(ds[split], desc=split):
-            text = mark_damage_signals((row["text"] or "")[:args.context_char_max])
-            enc = tokenizer(text, truncation=True, max_length=args.max_length, return_tensors="pt")
+        rows = ds[split]
+        for start in tqdm(range(0, len(rows), args.batch_size), desc=split):
+            batch = rows[start:start + args.batch_size]
+            texts = [mark_damage_signals((t or "")[:args.context_char_max]) for t in batch["text"]]
+            enc = tokenizer(texts, truncation=True, max_length=args.max_length, padding=True, return_tensors="pt")
             input_ids = enc["input_ids"].to(device)
             attn = enc["attention_mask"].to(device)
-            emb = document_embedding(model, input_ids, attn)
-            embeddings.append(emb)
-            meta.append({
-                "tablet_id": row["tablet_id"], "split": split,
-                "period": label_name("period", row["period_labels"]),
-                "genre": label_name("genre", row["genre_labels"]),
-                "language": label_name("language", row["language_labels"]),
-                "provenience": label_name("provenience", row["provenience_labels"]),
-                "text": row["text"],
-                "signs": " ".join(row["signs"]) if row["signs"] else "",
-            })
+            embs = batched_document_embedding(model, input_ids, attn)
+            for i in range(len(texts)):
+                embeddings.append(embs[i])
+                meta.append({
+                    "tablet_id": batch["tablet_id"][i], "split": split,
+                    "period": label_name("period", batch["period_labels"][i]),
+                    "genre": label_name("genre", batch["genre_labels"][i]),
+                    "language": label_name("language", batch["language_labels"][i]),
+                    "provenience": label_name("provenience", batch["provenience_labels"][i]),
+                    "text": batch["text"][i],
+                    "signs": " ".join(batch["signs"][i]) if batch["signs"][i] else "",
+                    "translation": batch.get("translation", [None] * len(texts))[i] or "",
+                })
 
     os.makedirs(args.out_dir, exist_ok=True)
     arr = np.stack(embeddings).astype(np.float32)
