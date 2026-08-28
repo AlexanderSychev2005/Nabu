@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nabu | Akkadian NLP Tool</title>
-    <link rel="stylesheet" href="/static/style.css?v=4">
+    <link rel="stylesheet" href="/static/style.css?v=8">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -31,8 +31,7 @@
                 <span class="section-label">How to use</span>
                 <ul class="instructions-list">
                     <li>Type or paste a transliteration below, including spaces.</li>
-                    <li>Type <code>?</code> wherever you want the model's guess. Leave none and a random 15% of
-                        positions get auto-masked instead.</li>
+                    <li>Type <code>?</code> wherever you want the model's guess.</li>
                     <li>Use <code>x</code> for a single sign of unclear reading and <code>...</code> for a gap of unknown
                         length -- both are read as context only, not restored. Our model predicts one sub-word token
                         at a time, so unlike Aeneas's own arbitrary-length restoration, an unknown-length gap can't
@@ -144,6 +143,6 @@
         </div>
     </div>
 
-    <script src="/static/script.js?v=4"></script>
+    <script src="/static/script.js?v=8"></script>
 </body>
 </html>

@@ -42,6 +42,38 @@ const PERIOD_ORDER = [
     "Middle Babylonian", "Neo-Assyrian", "Neo-Babylonian", "Late Antiquity",
 ];
 
+// Approximate calendar ranges for each period class, shown alongside the
+// label wherever it appears -- these are rough eras, not precise boundaries.
+const PERIOD_YEARS = {
+    "Third Millennium": "c. 3000–2100 BCE", "Ur III": "c. 2112–2004 BCE",
+    "Old Assyrian": "c. 1950–1750 BCE", "Old Babylonian": "c. 1900–1600 BCE",
+    "Middle Assyrian": "c. 1400–1050 BCE", "Middle Babylonian": "c. 1500–1000 BCE",
+    "Neo-Assyrian": "c. 911–609 BCE", "Neo-Babylonian": "c. 626–539 BCE",
+    "Late Antiquity": "c. 539 BCE–100 CE",
+};
+const periodLabel = (p) => (PERIOD_YEARS[p] ? `${p} (${PERIOD_YEARS[p]})` : p);
+
+// Public source page for a tablet_id, where one exists -- CDLI ("P123456")
+// and eBL ("ebl:BM.42004") both resolve to a live, verified page; ORACC
+// ("oracc:{project}:{textid}") is included on the same footing even though
+// its own site has a history of extended downtime, so the link may 404 or
+// time out depending on whether oracc.org happens to be up.
+function sourceUrl(tabletId) {
+    if (/^P\d+$/.test(tabletId)) return `https://cdli.earth/artifacts/${tabletId.slice(1)}`;
+    if (tabletId.startsWith("ebl:")) return `https://www.ebl.lmu.de/fragmentarium/${tabletId.slice(4)}`;
+    if (tabletId.startsWith("oracc:")) {
+        const [, project, textid] = tabletId.split(":");
+        return `http://oracc.org/${project}/${textid}`;
+    }
+    return null;
+}
+
+function tabletLink(tabletId, className) {
+    const url = sourceUrl(tabletId);
+    if (!url) return tabletId;
+    return `<a href="${url}" target="_blank" rel="noopener" class="${className}" onclick="event.stopPropagation()">${tabletId} ↗</a>`;
+}
+
 const TASKS = ["period", "genre", "language", "provenience"];
 
 // The three frontend-facing gap symbols -- bolded wherever rendered (token
@@ -259,7 +291,7 @@ function renderBarChart(canvasId, task, allProbs) {
     chartInstances[task] = new Chart(ctx, {
         type: "bar",
         data: {
-            labels: sorted.map((c) => c.label),
+            labels: sorted.map((c) => (task === "period" ? periodLabel(c.label) : c.label)),
             datasets: [{
                 data: sorted.map((c) => c.prob),
                 backgroundColor: sorted.map((c) => (c.label === topLabel ? SEAL : CLAY)),
@@ -317,7 +349,8 @@ function renderMetadata(result) {
         // 160px for every head) -- otherwise Chart.js's autoSkip silently
         // drops some y-axis labels rather than overlapping them once a head
         // like provenience has more bars than a fixed height has room for.
-        block.innerHTML = `<div class="meta-head-title">${task}: <b>${pred.label}</b> (${(pred.confidence * 100).toFixed(0)}%)</div>
+        const labelDisplay = task === "period" ? periodLabel(pred.label) : pred.label;
+        block.innerHTML = `<div class="meta-head-title">${task}: <b>${labelDisplay}</b> (${(pred.confidence * 100).toFixed(0)}%)</div>
             <div class="chart-wrap" style="height:${28 * barCount + 20}px;"><canvas id="chart-${task}"></canvas></div>`;
         wrap.appendChild(block);
         renderBarChart(`chart-${task}`, task, pred.probs);
@@ -386,11 +419,16 @@ function similarCard(d) {
     const el = document.createElement("div");
     el.className = "similar-card";
     const preview = (d.text || "").slice(0, 140) + ((d.text || "").length > 140 ? "…" : "");
-    const tags = [d.period, d.genre, d.provenience].filter(Boolean).join(" · ");
+    // Strip the <i> markup our own cleaning adds (see backfill_translations.py)
+    // before truncating -- slicing mid-tag would corrupt the innerHTML below.
+    const trPlain = (d.translation || "").replace(/<[^>]+>/g, "");
+    const trPreview = trPlain.length > 120 ? trPlain.slice(0, 120) + "…" : trPlain;
+    const tags = [d.period && periodLabel(d.period), d.genre, d.provenience].filter(Boolean).join(" · ");
     const pct = Math.round(d.score * 100);
     el.innerHTML = `
-        <div class="similar-card-id">${d.tablet_id}</div>
+        <div class="similar-card-id">${tabletLink(d.tablet_id, "tablet-link")}</div>
         <div class="similar-card-preview">${preview || "(no transliteration on file)"}</div>
+        ${trPreview ? `<div class="similar-card-translation">${trPreview}</div>` : ""}
         <div class="similar-card-tags">${tags}</div>
         <div class="similar-card-score-row">
             <span class="similar-score-bar-wrap"><span class="similar-score-bar" style="width:${pct}%"></span></span>
@@ -400,18 +438,54 @@ function similarCard(d) {
     return el;
 }
 
+// A real per-line parse (face/num-numbered, from the tablet's own raw ATF
+// or ORACC edition -- see build_line_tables.py) reads far better than our
+// own flattened whole-document 'text'/'signs'/'translation' columns, which
+// lose line boundaries in the corpus merge. Columns are only shown when at
+// least one line actually has that data (an ORACC-sourced table never has
+// cuneiform signs, only transliteration + translation).
+function renderLineTable(lines) {
+    const hasSigns = lines.some((l) => l.signs);
+    const hasTranslation = lines.some((l) => l.translation);
+    const head = `<tr><th>#</th>${hasSigns ? "<th>Cuneiform</th>" : ""}<th>Transliteration</th>${hasTranslation ? "<th>Translation</th>" : ""}</tr>`;
+    const rows = lines.map((l) => {
+        const label = l.face && l.face !== "default" ? `${l.face} ${l.num}` : l.num;
+        return `<tr>
+            <td class="line-num">${label}</td>
+            ${hasSigns ? `<td class="line-signs">${l.signs || ""}</td>` : ""}
+            <td class="line-translit">${l.translit || ""}</td>
+            ${hasTranslation ? `<td class="line-translation">${l.translation || ""}</td>` : ""}
+        </tr>`;
+    }).join("");
+    return `<table class="line-table"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+}
+
 function openDocModal(d) {
     const body = $("doc-modal-body");
     const tags = [
-        d.period && `period: ${d.period}`, d.genre && `genre: ${d.genre}`,
+        d.period && `period: ${periodLabel(d.period)}`, d.genre && `genre: ${d.genre}`,
         d.language && `language: ${d.language}`, d.provenience && `provenience: ${d.provenience}`,
     ].filter(Boolean).join(" · ");
+    // The line table's own edition doesn't always match the tablet_id's own
+    // top-level link above (see build_line_tables.py's docstring) -- e.g. a
+    // CDLI P-number tablet whose translation only exists on ORACC gets its
+    // line table built from ORACC's edition, so the two links can genuinely
+    // point to two different pages for the same physical tablet.
+    const sourceCaption = d.lines_source
+        ? `<p class="line-source">Source: ${d.lines_source_url
+            ? `<a href="${d.lines_source_url}" target="_blank" rel="noopener">${d.lines_source} ↗</a>`
+            : d.lines_source}</p>`
+        : "";
+    const textBlock = (d.lines && d.lines.length)
+        ? `<div class="modal-section-label">Line by line</div>${sourceCaption}${renderLineTable(d.lines)}`
+        : `${d.signs ? `<div class="modal-section-label">Cuneiform</div><div class="modal-signs">${d.signs}</div>` : ""}
+           <div class="modal-section-label">Transliteration</div>
+           <div class="modal-text">${d.text || "(no transliteration on file)"}</div>
+           ${d.translation ? `<div class="modal-section-label">English translation</div><div class="modal-text">${d.translation}</div>` : ""}`;
     body.innerHTML = `
-        <div class="modal-title">${d.tablet_id}</div>
+        <div class="modal-title">${tabletLink(d.tablet_id, "tablet-link")}</div>
         <div class="modal-tags">${tags || "(no metadata on file)"}</div>
-        ${d.signs ? `<div class="modal-section-label">Cuneiform</div><div class="modal-signs">${d.signs}</div>` : ""}
-        <div class="modal-section-label">Transliteration</div>
-        <div class="modal-text">${d.text || "(no transliteration on file)"}</div>
+        ${textBlock}
         <div class="modal-section-label">Similarity to your query</div>
         <div class="modal-text">${Math.round(d.score * 100)}% (cosine similarity of document embeddings)</div>`;
     $("doc-modal").classList.remove("hidden");

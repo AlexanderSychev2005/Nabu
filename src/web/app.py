@@ -21,7 +21,6 @@ import base64
 import io
 import json
 import os
-import random
 import re
 import sys
 from pathlib import Path
@@ -46,17 +45,21 @@ from src.training.train_mbert import (
 from src.data_pipeline.prepare_hf_dataset import clean_transliteration
 from src.analysis.interpret import text_gradient_saliency, image_gradcam, document_embedding, nearest_documents
 
-# The restoration-request marker: a standalone "?", not glued onto a sign
-# the way ATF's own uncertainty flag is (e.g. "lu-u?") -- that glued form is
-# already stripped as noise by clean_transliteration/cuneiform_unicode.py,
-# so an isolated "?" never collides with real corpus content. Deliberately a
-# third symbol, not "x"/"..." -- those already mean something else (a KNOWN
-# damage type, excluded from prediction, see mark_damage_signals) and reusing
-# them for "please predict this" would conflate two different signals.
-# Mirrors Aeneas's own convention (Assael et al. 2025): '-' for a known
-# single-character gap, '#' for one of unknown length, and a separate '?'
-# marking exactly the positions fed to the restoration head for prediction.
-QUESTION_MARK_RE = re.compile(r"(?<!\S)\?(?!\S)")
+# The restoration-request marker: a "?" delimited by whitespace, a hyphen,
+# or string boundary on each side -- not glued directly onto a sign the way
+# ATF's own uncertainty flag is (e.g. "lu-u?"). That glued form is already
+# stripped as noise by clean_transliteration/cuneiform_unicode.py before this
+# runs, so it never reaches here; allowing a hyphen neighbor (not just
+# whitespace) is what a user typing "?" in place of a masked sign inside a
+# hyphenated word actually produces, e.g. "qi2-?-ma" -- see the textarea's
+# own placeholder example. Deliberately a third symbol, not "x"/"..." --
+# those already mean something else (a KNOWN damage type, excluded from
+# prediction, see mark_damage_signals) and reusing them for "please predict
+# this" would conflate two different signals. Mirrors Aeneas's own
+# convention (Assael et al. 2025): '-' for a known single-character gap, '#'
+# for one of unknown length, and a separate '?' marking exactly the
+# positions fed to the restoration head for prediction.
+QUESTION_MARK_RE = re.compile(r"(?<![^\s-])\?(?![^\s-])")
 
 BASE_DIR = Path(__file__).parent.parent.parent
 CHECKPOINT = BASE_DIR / "checkpoints_final_vision" / "final_model"
@@ -78,20 +81,19 @@ banned_ids = None
 doc_embeddings = None
 doc_ids = None
 doc_meta_by_id = None
+doc_lines_by_id = None
 
 
 class AnalyzeRequest(BaseModel):
     text: str
     image_base64: Optional[str] = None
-    mlm_probability: float = 0.15
-    seed: int = 0
     temperature: float = 1.0
     restore: bool = True
 
 
 def load_resources() -> None:
     global tokenizer, model, label_configs, banned_ids
-    global doc_embeddings, doc_ids, doc_meta_by_id
+    global doc_embeddings, doc_ids, doc_meta_by_id, doc_lines_by_id
 
     with open(LABEL_CONFIG_PATH, encoding="utf-8") as f:
         label_configs = json.load(f)
@@ -125,6 +127,15 @@ def load_resources() -> None:
     else:
         print(f"  No precomputed embeddings at {EMBEDDINGS_DIR} -- run compute_embeddings.py first; "
               f"'similar documents' will be empty until then.")
+
+    lines_path = EMBEDDINGS_DIR / "doc_lines.json"
+    if lines_path.exists():
+        with open(lines_path, encoding="utf-8") as f:
+            doc_lines_by_id = json.load(f)
+        print(f"  {len(doc_lines_by_id)} tablets have a real per-line table (build_line_tables.py)")
+    else:
+        doc_lines_by_id = {}
+        print(f"  No {lines_path} -- run build_line_tables.py for a per-line similar-documents view.")
     print("Ready.")
 
 
@@ -161,7 +172,6 @@ def _predict_head(out: dict, task: str) -> dict:
 
 @app.post("/api/analyze")
 def analyze(req: AnalyzeRequest) -> dict:
-    rng = random.Random(req.seed)
     text = clean_transliteration(req.text)
     # A user types a standalone "?" wherever they want the model's guess
     # (see QUESTION_MARK_RE above for why this symbol and not "x"/"...").
@@ -177,21 +187,11 @@ def analyze(req: AnalyzeRequest) -> dict:
     input_ids = enc["input_ids"]
     truncated = full_length > MAX_LENGTH
 
-    # Positions come from the user's own typed "?" marks (now [MASK] tokens
-    # above), or -- if they typed none -- an auto-masked random slice (same
-    # 15% recipe as training/demo_predictions.py) so the tool still does
-    # something useful on a pasted passage with no gap marked. req.restore
-    # =False means "just attribute/find parallels for this text as-is" --
-    # skip masking (and the whole Restoration section) entirely, for an
-    # already-intact text the auto-masker would otherwise damage pointlessly.
-    if not req.restore:
-        positions = []
-    elif tokenizer.mask_token_id in input_ids:
-        positions = [i for i, t in enumerate(input_ids) if t == tokenizer.mask_token_id]
-    else:
-        eligible = [i for i, t in enumerate(input_ids) if t not in banned_ids]
-        n_mask = max(1, round(len(eligible) * req.mlm_probability)) if eligible else 0
-        positions = sorted(rng.sample(eligible, min(n_mask, len(eligible)))) if eligible else []
+    # Positions come only from the user's own typed "?" marks (now [MASK]
+    # tokens above) -- no auto-masking fallback. req.restore=False means
+    # "just attribute/find parallels for this text as-is" -- skip masking
+    # (and the whole Restoration section) entirely.
+    positions = [i for i, t in enumerate(input_ids) if t == tokenizer.mask_token_id] if req.restore else []
 
     masked_ids = list(input_ids)
     for p in positions:
@@ -266,11 +266,16 @@ def analyze(req: AnalyzeRequest) -> dict:
         query_emb = document_embedding(model, input_tensor, attn_tensor)
         for tid, score in nearest_documents(query_emb, doc_embeddings, doc_ids, k=20):
             row = doc_meta_by_id.get(tid, {})
+            line_table = doc_lines_by_id.get(tid) or {}
             similar_documents.append({
                 "tablet_id": tid, "score": score,
                 "period": row.get("period"), "genre": row.get("genre"),
                 "language": row.get("language"), "provenience": row.get("provenience"),
                 "text": row.get("text"), "signs": row.get("signs"),
+                "translation": row.get("translation"),
+                "lines": line_table.get("lines"),
+                "lines_source": line_table.get("source"),
+                "lines_source_url": line_table.get("source_url"),
             })
 
     return {
