@@ -1,4 +1,4 @@
-"""Web demo for the trained Nabu (Akkadian mBERT) checkpoint -- same
+"""Web demo for the trained Enheduanna (Akkadian mBERT) checkpoint -- same
 stack as kyivan/src/web (FastAPI + a static vanilla-JS page, no separate
 frontend build): a single-page tool is plenty for one input box, one image
 slot and a handful of result panels, and this keeps the whole project
@@ -67,10 +67,10 @@ LABEL_CONFIG_PATH = BASE_DIR / "data" / "processed" / "label_configs.json"
 EMBEDDINGS_DIR = BASE_DIR / "results_final" / "embeddings"
 MODEL_NAME = "bert-base-multilingual-cased"
 TASKS = ["period", "genre", "language", "provenience"]
-MAX_LENGTH = 96
+MAX_LENGTH = 512
 IMG_SIZE = 224
 
-app = FastAPI(title="Nabu Web")
+app = FastAPI(title="Enheduanna Web")
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

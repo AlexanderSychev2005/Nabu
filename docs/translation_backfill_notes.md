@@ -4,6 +4,22 @@ A `translation` column (empty string where none found) was added to
 `hf_dataset` / `hf_dataset_documents_with_cdli_bulk` / `hf_dataset_signs_translit`,
 keyed by `tablet_id` -- see `src/data_pipeline/backfill_translations.py`.
 
+**2026-08-28 corpus rebuild.** `prepare_oracc.py` and 6 other pipeline files
+had a `len(signs) < 2` line filter that discarded a line's entire
+transliteration whenever cuneiform-sign recovery came up short (correct
+behavior for a genuinely empty line, but some ORACC projects -- e.g. CMAwR,
+a normalized-reading edition -- carry real transliterated text with no
+sign-glyph data at all for many words, and those lines were silently
+dropped). Fixed to keep a line when it has real transliteration text even
+with fewer than 2 recovered signs. Effect: `combined_unique.jsonl` 636,051 ->
+1,208,953 lines, `documents` config 56,934 -> 126,015 tablets. The
+translation lookup itself (`translations.json`, same 3 sources) is
+unaffected by the fix -- extraction logic didn't change -- but the coverage
+*percentages* below shifted because the denominator (total documents) grew
+much faster than the numerator (translated documents), since most of the
+newly-recovered text is exactly the kind of normalized-reading edition that
+was never independently translated.
+
 ## Sources used
 
 1. **CDLI-bulk ATF** (`data/raw/cdli_bulk/cdliatf_unblocked.atf`) -- its own
@@ -66,38 +82,44 @@ join against sources 1-3 automatically without needing separate handling.
   (Literary & Scholarly) is already the best-covered one (see below) via
   ORACC's own literary sub-projects.
 
-## Final coverage
+## Final coverage (post 2026-08-28 rebuild)
 
 | granularity | coverage |
 |---|---|
-| `documents` (56,934 unique tablets) | 17.6% |
-| line-level (`default`/`signs_translit`) | ~28-31% |
+| `documents` (126,015 unique tablets) | 12.9% (16,283 tablets) |
+| line-level `default` (1,148,420 lines) | 22.1% |
+| line-level `signs_translit` (612,224 lines, signs>=2 only) | 28.5% |
 
 By genre (documents config):
 
 | genre | coverage |
 |---|---|
-| Literary & Scholarly | 54.9% |
-| Legal | 30.1% |
-| Royal Inscriptions | 15.1% |
-| Letters | 14.1% |
-| Administrative | 9.2% |
+| Literary & Scholarly | 50.1% |
+| Legal | 45.6% |
+| Royal Inscriptions | 15.4% |
+| Letters | 12.6% |
+| Administrative | 6.6% |
 | Lexical | 1.8% |
 
 Uneven by design, not a bug -- translation effort in the field goes to
 literature/law/royal texts, essentially never to routine administrative
-records. Treat 17.6%/30% as the realistic ceiling from open scholarly
-sources; searching further is likely to surface only re-packagings of the
-same three root sources (CDLI/eBL/ORACC) rather than new coverage.
+records. The absolute translated-document count actually *rose* with the
+rebuild (10,003 -> 16,283) since the fix recovers real tablets, not just
+denominator noise; the percentage dropped because the newly-recovered
+normalized-reading editions are disproportionately untranslated. Treat
+~13%/22-28% as the realistic ceiling from open scholarly sources; searching
+further is likely to surface only re-packagings of the same three root
+sources (CDLI/eBL/ORACC) rather than new coverage.
 
-## Not done yet, worth revisiting
+## Per-line view (done)
 
-The ORACC HTML pages this session parsed carry genuine per-line structure
-(`p.tr` cells 1:1 with transliteration lines) that got flattened into one
-whole-document `translation` string, same as `text`/`signs` already are.
-A real per-line 3-column view (cuneiform | transliteration | translation)
-in the web demo's "Similar documents" card -- discussed, not built --
-would reuse this same parsed structure instead of re-deriving it.
-`demo_predictions.py`'s `build_line_table()`/`atf_to_lines()` already do
-this for CDLI/eBL-sourced showcase tablets; the ORACC HTML path would need
-an equivalent per-line extraction (keep line index instead of joining).
+The ORACC HTML pages' genuine per-line structure (`p.tr` cells 1:1 with
+transliteration lines) is no longer flattened into one whole-document
+string. `src/analysis/build_line_tables.py` builds
+`results_final/embeddings/doc_lines.json` -- a real per-line (cuneiform |
+transliteration | translation) table per tablet, sourced from whichever of
+CDLI/eBL raw ATF or the ORACC HTML cache has translated lines (or just more
+lines), with the other kept as an "also see" alt-source link when both
+exist. The web demo's "Similar documents" card modal renders this directly.
+After the 2026-08-28 rebuild: 100,537/126,015 tablets (79.8%) have a line
+table.

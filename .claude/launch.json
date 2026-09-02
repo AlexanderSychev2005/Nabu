@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "nabu-web",
+      "name": "enheduanna-web",
       "runtimeExecutable": ".venv/Scripts/python.exe",
       "runtimeArgs": ["src/web/app.py"],
       "port": 8001

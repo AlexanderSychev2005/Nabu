@@ -264,13 +264,20 @@ def load_and_deduplicate_v2(files: list) -> list[dict]:
                         skipped_cross_source += 1
                         continue
                     signs = data.get('signs', [])
-                    if not signs: continue
                     sign_str = "".join(signs).strip()
-                    if not sign_str: continue
+                    # A signless-but-textful line (prepare_oracc.py's own
+                    # normalized-edition case, see its docstring) has
+                    # nothing to dedup by via sign_str -- fall back to the
+                    # raw transliteration text as the dedup key instead of
+                    # dropping the line outright. Dropping *both* would
+                    # mean the line has no readable content at all.
+                    raw_text = (data.get('raw') or '').strip()
+                    dedup_key = sign_str or raw_text
+                    if not dedup_key: continue
 
                     # Merge metadata
-                    if sign_str in unique_lines:
-                        existing = unique_lines[sign_str]
+                    if dedup_key in unique_lines:
+                        existing = unique_lines[dedup_key]
                         existing['provenience'] = data.get('provenience', existing.get('provenience', 'unknown'))
                         existing['language'] = data.get('language', existing.get('language', 'unknown'))
                         if existing.get('period', 'unknown').lower() == 'unknown':
@@ -278,7 +285,7 @@ def load_and_deduplicate_v2(files: list) -> list[dict]:
                         if existing.get('genre', 'unknown').lower() == 'unknown':
                             existing['genre'] = data.get('genre', 'unknown')
                     else:
-                        unique_lines[sign_str] = data
+                        unique_lines[dedup_key] = data
                 except Exception:
                     pass
 

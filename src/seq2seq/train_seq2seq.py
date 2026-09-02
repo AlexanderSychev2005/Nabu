@@ -46,7 +46,7 @@ from transformers import T5Config, T5ForConditionalGeneration
 from transformers.optimization import get_cosine_schedule_with_warmup
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DEFAULT_REPO_ID = "AlexSychovUN/Nabu-Dataset"
+DEFAULT_REPO_ID = "AlexSychovUN/Enheduanna-Dataset"
 HF_CONFIG = "signs_translit"
 
 

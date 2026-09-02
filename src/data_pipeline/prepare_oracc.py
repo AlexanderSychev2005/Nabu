@@ -136,10 +136,27 @@ def process_zip(zip_path: str, out_f, seen_signs: set[str]) -> dict:
         for line in parse_corpus_json(data, metadata):
             stats["total"] += 1
             signs = [s for s in line["signs"] if s]
-            if len(signs) < 2:
+            raw_text = (line.get("raw") or "").strip()
+            # len(signs) < 2 alone used to drop every line here, but some
+            # ORACC projects (e.g. cmawro's normalized-reading editions)
+            # never carry sign-level 'gdl' data at all for a lemma -- only
+            # its normalized form ("irkusu", not a syllable-by-syllable
+            # transliteration) -- so a fully legible line with real words
+            # was being discarded as if it were noise. Measured directly:
+            # cmawro/cmawr2 lost 69.3% of its lines to this filter despite
+            # them having real text; a syllabic-ATF project like rinap/
+            # rinap1 only lost 2.0% (genuinely near-empty lines). Keep any
+            # line with real text regardless of its sign count now.
+            if len(signs) < 2 and not raw_text:
                 stats["skipped_empty"] += 1
                 continue
-            sign_key = "".join(signs)
+            # Dedup key: sign-string when there are signs to dedup by (the
+            # original behavior); when there are none, an empty sign_key
+            # would make every signless line in this project collide with
+            # every other one, keeping only the first -- fall back to the
+            # cleaned text instead so genuinely different signless lines
+            # don't wrongly shadow each other.
+            sign_key = "".join(signs) or raw_text
             if sign_key in seen_signs:
                 stats["skipped_dupe"] += 1
                 continue

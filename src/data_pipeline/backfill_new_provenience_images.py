@@ -111,7 +111,7 @@ def parse_tablet_text(body: str) -> str:
     texts = []
     for ln in parsed:
         signs = [s for s in ln["signs"] if s and s != "<S>"]
-        if len(signs) < 2:
+        if len(signs) < 2 and not (ln["raw"] or "").strip():
             continue
         t = clean_transliteration(ln["raw"])
         if t:

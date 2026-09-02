@@ -106,9 +106,16 @@ def main() -> None:
             tablet_signs, tablet_texts = [], []
             for ln in parsed:
                 signs = [s for s in ln["signs"] if s and s != "<S>"]
-                if len(signs) < 2:
+                raw_text = (ln["raw"] or "").strip()
+                # len(signs) < 2 alone used to drop the line even when it
+                # has real transliteration text -- see prepare_oracc.py's
+                # docstring for the confirmed case (a normalized-reading
+                # ORACC edition with no sign-level data at all for some
+                # lemmas). CDLI-bulk/eBL ATF is syllable-based so this
+                # rarely fires here, but the same guard is cheap to add.
+                if len(signs) < 2 and not raw_text:
                     continue
-                sign_key = "".join(signs)
+                sign_key = "".join(signs) or raw_text
                 if sign_key in existing_keys:
                     n_dupe += 1
                     continue
@@ -119,7 +126,7 @@ def main() -> None:
                     tablet_texts.append(text)
 
             text = re.sub(r"\s+", " ", " ".join(tablet_texts)).strip()
-            if not text or not tablet_signs:
+            if not text:
                 n_empty += 1
                 continue
 

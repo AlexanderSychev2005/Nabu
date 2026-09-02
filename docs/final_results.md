@@ -15,7 +15,7 @@ independently reconfirmed post-rebuild.
 
 Two deliverable models, both mBERT multi-task (period/genre/language/
 provenience heads + MLM), trained on the `documents` HF config
-(`AlexSychovUN/Nabu-Dataset`), 24 epochs, `context_char_min=32
+(`AlexSychovUN/Enheduanna-Dataset`), 24 epochs, `context_char_min=32
 context_char_max=850 max_length=512 batch_size=64 grad_accum=4`.
 
 ## Final models

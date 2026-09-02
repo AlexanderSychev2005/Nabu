@@ -409,7 +409,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--text_checkpoint", type=str, default=r"C:\Programming\akkadian\checkpoints_final_text\final_model")
     parser.add_argument("--vision_checkpoint", type=str, default=r"C:\Programming\akkadian\checkpoints_final_vision\final_model")
-    parser.add_argument("--data_dir", type=str, default="AlexSychovUN/Nabu-Dataset")
+    parser.add_argument("--data_dir", type=str, default="AlexSychovUN/Enheduanna-Dataset")
     parser.add_argument("--hf_config", type=str, default="documents")
     parser.add_argument("--split", type=str, default="test")
     parser.add_argument("--label_config", type=str, default=None)

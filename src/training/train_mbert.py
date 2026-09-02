@@ -535,7 +535,7 @@ def train() -> None:
     # Real token-length distribution (mBERT's own WordPiece tokenizer over
     # combined_unique.jsonl): median=18, p99=72, p99.9=120 -- 96 covers
     # 99.7% of examples at little more than half the attention FLOPs of 128.
-    parser.add_argument("--max_length", type=int, default=96)
+    parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--precision", type=str, choices=["fp32", "fp16", "bf16"], default="fp16", help="Mixed precision mode -- fp16 for T4/Colab, bf16 for Ampere+ (A100/newer)")
     parser.add_argument("--resume_from_checkpoint", type=str, default=None, help="Path to a specific checkpoint, or 'auto' to resume from the latest one in --save_dir")
     parser.add_argument("--use_image", action="store_true", help="Add the vision branch (Aeneas-style concat), scoped to provenience_head only, ImageNet-finetune init")

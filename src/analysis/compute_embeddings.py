@@ -62,11 +62,11 @@ def batched_document_embedding(model, input_ids: torch.Tensor, attention_mask: t
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", default=os.path.join(BASE_DIR, "checkpoints_final_vision", "final_model"))
-    parser.add_argument("--data_dir", default="AlexSychovUN/Nabu-Dataset")
+    parser.add_argument("--data_dir", default="AlexSychovUN/Enheduanna-Dataset")
     parser.add_argument("--hf_config", default="documents")
     parser.add_argument("--model_name", default="bert-base-multilingual-cased")
     parser.add_argument("--label_config", default=os.path.join(BASE_DIR, "data", "processed", "label_configs.json"))
-    parser.add_argument("--max_length", type=int, default=96)
+    parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--context_char_max", type=int, default=768,
                          help="Matches the document-granularity training window (MBertCollator's own default)")
     parser.add_argument("--batch_size", type=int, default=16,

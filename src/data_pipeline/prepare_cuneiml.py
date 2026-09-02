@@ -76,7 +76,14 @@ def main() -> None:
                             signs = line_obj.get("sign", [])
                             raw_text = line_obj.get("raw", "")
                             
-                            if signs and len(signs) > 1:
+                            # CuneiML's own transliteration is generated
+                            # from sign recognition, so a real raw_text with
+                            # an empty/short signs list shouldn't happen in
+                            # practice (unlike prepare_oracc.py's confirmed
+                            # normalized-edition case) -- same guard kept
+                            # here anyway for consistency with the rest of
+                            # the pipeline's line-acceptance rule.
+                            if (signs and len(signs) > 1) or (raw_text or "").strip():
                                 out_obj = {
                                     "raw": raw_text,
                                     "signs": signs,

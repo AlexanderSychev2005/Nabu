@@ -96,9 +96,10 @@ def parse_tablet(tid: str, body: str, existing_keys: set[str]) -> tuple[str, lis
     tablet_signs, tablet_texts = [], []
     for ln in parsed:
         signs = [s for s in ln["signs"] if s and s != "<S>"]
-        if len(signs) < 2:
+        raw_text = (ln["raw"] or "").strip()
+        if len(signs) < 2 and not raw_text:
             continue
-        sign_key = "".join(signs)
+        sign_key = "".join(signs) or raw_text
         if sign_key in existing_keys:
             continue
         existing_keys.add(sign_key)
@@ -160,7 +161,7 @@ def main() -> None:
             text, signs, misses, tok = parse_tablet(tid, body, existing_keys)
             n_miss += misses
             n_tok += tok
-            if not text or not signs:
+            if not text:
                 n_empty += 1
                 continue
             meta = cdli_meta_by_id.get(idt, {})

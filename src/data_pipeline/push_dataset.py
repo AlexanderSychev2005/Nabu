@@ -20,8 +20,8 @@ CONFIG_DIRS = {
 def main() -> None:
     base_dir = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))) / "data" / "processed"
 
-    parser = argparse.ArgumentParser(description="Push a Nabu dataset config to Hugging Face Hub")
-    parser.add_argument("--repo_id", type=str, default="Nabu-Dataset", help="Repository name (will be prefixed with your username)")
+    parser = argparse.ArgumentParser(description="Push an Enheduanna dataset config to Hugging Face Hub")
+    parser.add_argument("--repo_id", type=str, default="Enheduanna-Dataset", help="Repository name (will be prefixed with your username)")
     parser.add_argument("--config_name", type=str, default="documents", choices=list(CONFIG_DIRS))
     args = parser.parse_args()
 

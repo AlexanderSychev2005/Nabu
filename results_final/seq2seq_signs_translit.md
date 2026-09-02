@@ -4,7 +4,7 @@ Companion to the main restoration+attribution model -- a from-scratch
 character-level T5 that reads a line's Unicode cuneiform signs and predicts
 its transliteration, motivated by and compared against Gordin et al. 2020
 (Akkademia). Code in `src/seq2seq/`; data is the `signs_translit` config on
-`AlexSychovUN/Nabu-Dataset` (612,974 line pairs, no new annotation needed --
+`AlexSychovUN/Enheduanna-Dataset` (612,974 line pairs, no new annotation needed --
 derived from the same corpus via `cuneiform_unicode.py`'s existing sign
 conversion, split by the same authoritative tablet_id -> split map as
 `documents`/`vision`).
