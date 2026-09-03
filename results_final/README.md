@@ -34,9 +34,12 @@ strict split. This is the number to actually cite.
   result is from Akkadian-specific finetuning vs. mBERT's own multilingual
   pretraining.
 - `predictions_demo.md` — 20 random test-split tablets. `predictions_demo_showcase.md`
-  — 11 hand-picked tablets (Gilgamesh/Enuma Elish/Atrahasis/Hammurabi + P387407,
-  plus Enheduanna's Exaltation of Inanna, Temple Hymns, and dedicatory disc).
-  Each example has:
+  — 12 hand-picked tablets (Gilgamesh/Enuma Elish/Atrahasis/Hammurabi + P387407,
+  plus Enheduanna's Exaltation of Inanna and dedicatory disc -- represented
+  twice, once as the RIME scholarly composite (P461942, translation but no
+  photo) and once as an actual photographed exemplar (P217330, Penn Museum,
+  RIME 2.01.01.16 ex. 01 -- the real disc, no translation but a real photo
+  and line table)). Each example has:
   - a one-line **description** (genre/period/collection/publication, pulled
     from whichever of eBL/CDLI actually has this tablet);
   - a **side-by-side block**: the 224x224 crop the model actually sees + the
@@ -55,16 +58,18 @@ strict split. This is the number to actually cite.
     flagged `<- differs`.
 
   Description/translation/line-table coverage is honestly uneven, not a
-  bug: `predictions_demo_showcase.md` got a description+line-table for 8 of
-  its 11 examples (the 8 with a real photo); only 3 have any translation --
-  P387407 (an ordinary letter), plus Enheduanna's Exaltation of Inanna
-  (P346194) and dedicatory disc (P461942), both of which have a CDLI
-  translation despite one of them (the disc) lacking a photo. The remaining
-  7 are eBL-sourced literary fragments (Gilgamesh etc.) or the Hammurabi
-  stele (P249253) with no CDLI inscription record at all and no translation
-  field in eBL's own API either (checked both live). `predictions_demo.md`
-  did better on translations (3/20, ordinary administrative/lexical texts)
-  and got line tables for 18/20. Same wall this session already hit with
+  bug: `predictions_demo_showcase.md` got a description+line-table for 9 of
+  its 12 examples (the 9 with a real photo, P217330 among them); only 3 have
+  any translation -- P387407 (an ordinary letter), plus Enheduanna's
+  Exaltation of Inanna (P346194) and dedicatory disc (P461942, the RIME
+  composite -- its photographed twin P217330 has the line table and photo
+  but no translation, since CDLI's translation field is attached to the
+  composite entry, not the individual exemplar). The remaining 7 are
+  eBL-sourced literary fragments (Gilgamesh etc.) or the Hammurabi stele
+  (P249253) with no CDLI inscription record at all and no translation field
+  in eBL's own API either (checked both live). `predictions_demo.md` did
+  better on translations (3/20, ordinary administrative/lexical texts) and
+  got line tables for 18/20. Same wall this session already hit with
   K.3375: open translations for literary works don't really exist outside
   copyrighted scholarly editions.
 - `demo_images/` — `<tablet_id>.jpg` (model-input crop) and
@@ -173,7 +178,7 @@ uv run python src/analysis/demo_predictions.py \
   --text_checkpoint checkpoints_final_text/final_model \
   --vision_checkpoint checkpoints_final_vision/final_model \
   --data_dir AlexSychovUN/Enheduanna-Dataset --hf_config documents --split test \
-  --tablet_ids "P273207,P285823,P273223,P402919,ebl:BM.42004,P404643,P402685,P387407,P346194,P461942,P249253" \
+  --tablet_ids "P273207,P285823,P273223,P402919,ebl:BM.42004,P404643,P402685,P387407,P346194,P461942,P217330,P249253" \
   --context_char_max 850 --max_length 512 --embed_images --fetch_cdli_info \
   --output_file results_final/predictions_demo_showcase.md
 ```
