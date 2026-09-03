@@ -210,7 +210,17 @@ def atf_to_lines(raw_text: str) -> tuple[list[dict], Counter, int]:
 
         signs = _remove_spaces(signs)
         raw_out = re.sub(r"\s+", " ", raw_out).strip()
-        if text.strip() and raw_out:
+        # Gated on raw_out alone, not "text.strip() and raw_out": text
+        # (sign_src) goes empty whenever a line's content is ENTIRELY
+        # inside [...] (the whole span, content included, is stripped out
+        # of sign_src for signs lookup -- see comment above), which used
+        # to silently drop the line's raw_out transliteration too, even
+        # though it's real, policy says restorations are kept (Section 3
+        # of the paper), and this exact scenario -- real text, zero
+        # resolvable signs -- is already the normal case this project
+        # keeps everywhere else (prepare_oracc.py's own len(signs)<2 fix).
+        # Confirmed losing 4 of the Enheduanna disc's 13 lines this way.
+        if raw_out:
             lines_out.append({"raw": raw_out, "signs": signs, "num": line_num.strip(), "face": curr_face})
 
     return lines_out, misses, total_tokens
