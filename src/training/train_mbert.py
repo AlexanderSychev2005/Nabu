@@ -278,7 +278,7 @@ class MBertMultiTask(nn.Module):
         if any(l is not None for l in [labels, period_labels, genre_labels, language_labels, provenience_labels]):
             loss_mlm_fct = nn.CrossEntropyLoss(ignore_index=-100, label_smoothing=0.05)
             loss_meta_fct = nn.CrossEntropyLoss(ignore_index=-100, label_smoothing=0.1)
-            loss = 0.0
+            loss = torch.zeros((), device=mlm_logits.device, dtype=mlm_logits.dtype)
 
             # MLM=3.0, meta_weight defaults to 1.0 -- roughly matches
             # Aeneas's own multi-task weighting (restoration=3, region=2,

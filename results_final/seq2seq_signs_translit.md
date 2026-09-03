@@ -4,10 +4,14 @@ Companion to the main restoration+attribution model -- a from-scratch
 character-level T5 that reads a line's Unicode cuneiform signs and predicts
 its transliteration, motivated by and compared against Gordin et al. 2020
 (Akkademia). Code in `src/seq2seq/`; data is the `signs_translit` config on
-`AlexSychovUN/Enheduanna-Dataset` (612,974 line pairs, no new annotation needed --
-derived from the same corpus via `cuneiform_unicode.py`'s existing sign
-conversion, split by the same authoritative tablet_id -> split map as
-`documents`/`vision`).
+`AlexSychovUN/Enheduanna-Dataset` (612,224 line pairs -- train 550,263 /
+validation 31,293 / test 30,668 -- no new annotation needed, derived from
+the same corpus via `cuneiform_unicode.py`'s existing sign conversion, split
+by the same authoritative tablet_id -> split map as `documents`/`vision`).
+Retrained (session 2026-09-03) after this project's corpus-completeness fix
+(Section 3 of `docs/paper_draft.md`); numbers below supersede the earlier
+run's, which used the same architecture and hyperparameters on the
+pre-fix corpus.
 
 ## Why seq2seq, not Akkademia's tagging setup
 
@@ -37,15 +41,21 @@ transliteration character.
 | Checkpoint selection | best of top-3 by validation loss (not last-step) |
 | Decoding | beam search, num_beams=5 |
 
-**Test set (30,843 lines, held out, never used for training or checkpoint selection):**
+**Test set (30,668 lines, held out, never used for training or checkpoint selection):**
 
 | Metric | Value |
 |---|---|
-| CER | 13.0% |
+| CER | 12.3% |
 | WER | 28.6% |
-| Exact match | 44.7% |
+| Exact match | 44.1% |
 
 ## Experiments tried and retired (not shipped)
+
+Both ablations below were run on the pre-corpus-completeness-fix data and
+checkpoint (the 13.0/28.6/44.7 baseline, not the current shipped 12.3/28.6/44.1
+one); they were never rerun on the current corpus, since neither changed the
+shipped decision. Read their deltas as relative to that earlier baseline, not
+the current one.
 
 **Bigger model + BPE target tokenization.** d_model 512->768, layers 6->8,
 heads 8->12 (5.6M -> 133.7M params, ~4x), plus byte-level BPE instead of
