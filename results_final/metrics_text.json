@@ -1,413 +1,413 @@
 {
   "metrics": {
-    "loss": 7.569772720336914,
-    "model_preparation_time": 0.0042,
-    "period_acc": 0.9383251231527093,
-    "period_macro_f1": 0.85064422106887,
-    "genre_acc": 0.937394247038917,
-    "genre_macro_f1": 0.8542151542723865,
-    "language_acc": 0.9830694810905892,
-    "language_macro_f1": 0.8276168282630982,
-    "provenience_acc": 0.7431932040949684,
-    "provenience_macro_f1": 0.5687769106817986,
-    "mlm_acc": 0.7778647671136203,
-    "mlm_top3_acc": 0.866807074805928,
-    "mlm_top5_acc": 0.8955209068454482,
-    "mlm_mrr": 0.8315635675122554,
-    "runtime": 371.9072,
-    "samples_per_second": 15.961,
-    "steps_per_second": 7.98,
-    "mlm_cer": 0.2456078730242884
+    "loss": 6.582761764526367,
+    "model_preparation_time": 0.0045,
+    "period_acc": 0.9580615097856477,
+    "period_macro_f1": 0.8803438142755415,
+    "genre_acc": 0.960800529275554,
+    "genre_macro_f1": 0.9034521041351852,
+    "language_acc": 0.9852689277149709,
+    "language_macro_f1": 0.842686006753312,
+    "provenience_acc": 0.8618354216051473,
+    "provenience_macro_f1": 0.6738472364431093,
+    "mlm_acc": 0.8202160227217757,
+    "mlm_top3_acc": 0.8953195076948592,
+    "mlm_top5_acc": 0.9195063127561209,
+    "mlm_mrr": 0.8651778491191693,
+    "runtime": 511.0706,
+    "samples_per_second": 14.691,
+    "steps_per_second": 7.345,
+    "mlm_cer": 0.19544562740422697
   },
   "per_class": {
     "period": {
       "Neo-Assyrian": {
-        "precision": 0.9168,
-        "recall": 0.9182692307692307,
-        "f1-score": 0.9175340272217775,
-        "support": 624.0
+        "precision": 0.892128279883382,
+        "recall": 0.9329268292682927,
+        "f1-score": 0.9120715350223547,
+        "support": 656.0
       },
       "Ur III": {
-        "precision": 0.962457337883959,
-        "recall": 0.9849807893817674,
-        "f1-score": 0.9735888140859659,
-        "support": 2863.0
+        "precision": 0.9860406091370558,
+        "recall": 0.9905660377358491,
+        "f1-score": 0.9882981429661664,
+        "support": 3922.0
       },
       "Old Babylonian": {
-        "precision": 0.9046849757673667,
-        "recall": 0.8974358974358975,
-        "f1-score": 0.9010458567980691,
-        "support": 624.0
+        "precision": 0.9268635724331927,
+        "recall": 0.9268635724331927,
+        "f1-score": 0.9268635724331927,
+        "support": 711.0
       },
       "Old Assyrian": {
-        "precision": 0.967479674796748,
-        "recall": 0.9444444444444444,
-        "f1-score": 0.9558232931726908,
-        "support": 126.0
+        "precision": 0.9461538461538461,
+        "recall": 0.9534883720930233,
+        "f1-score": 0.9498069498069498,
+        "support": 129.0
       },
       "Middle Assyrian": {
-        "precision": 0.9159663865546218,
-        "recall": 0.9008264462809917,
-        "f1-score": 0.9083333333333333,
-        "support": 121.0
+        "precision": 0.9032258064516129,
+        "recall": 0.896,
+        "f1-score": 0.8995983935742972,
+        "support": 125.0
       },
       "Middle Babylonian": {
-        "precision": 0.75,
-        "recall": 0.72,
-        "f1-score": 0.7346938775510204,
-        "support": 100.0
+        "precision": 0.8278688524590164,
+        "recall": 0.8487394957983193,
+        "f1-score": 0.8381742738589212,
+        "support": 119.0
       },
       "Neo-Babylonian": {
-        "precision": 0.5957446808510638,
-        "recall": 0.4375,
-        "f1-score": 0.5045045045045045,
-        "support": 64.0
+        "precision": 0.7377049180327869,
+        "recall": 0.5555555555555556,
+        "f1-score": 0.6338028169014085,
+        "support": 81.0
       },
       "Third Millennium": {
-        "precision": 0.9480812641083521,
-        "recall": 0.8695652173913043,
-        "f1-score": 0.9071274298056156,
-        "support": 483.0
+        "precision": 0.9719789842381786,
+        "recall": 0.9173553719008265,
+        "f1-score": 0.9438775510204082,
+        "support": 605.0
       },
       "Late Antiquity": {
-        "precision": 0.8356164383561644,
-        "recall": 0.8714285714285714,
-        "f1-score": 0.8531468531468531,
-        "support": 70.0
+        "precision": 0.8172043010752689,
+        "recall": 0.8444444444444444,
+        "f1-score": 0.8306010928961749,
+        "support": 90.0
       },
-      "accuracy": 0.9383251231527093,
+      "accuracy": 0.9580615097856477,
       "macro avg": {
-        "precision": 0.8663145287020307,
-        "recall": 0.8382722885702454,
-        "f1-score": 0.85064422106887,
-        "support": 5075.0
+        "precision": 0.8899076855404822,
+        "recall": 0.8739932976921669,
+        "f1-score": 0.8803438142755415,
+        "support": 6438.0
       },
       "weighted avg": {
-        "precision": 0.9368276681501172,
-        "recall": 0.9383251231527093,
-        "f1-score": 0.9371706788156412,
-        "support": 5075.0
+        "precision": 0.9577991079471078,
+        "recall": 0.9580615097856477,
+        "f1-score": 0.9576390063522959,
+        "support": 6438.0
       }
     },
     "genre": {
       "Administrative": {
-        "precision": 0.962757087270706,
-        "recall": 0.9807474518686297,
-        "f1-score": 0.9716690042075736,
-        "support": 3532.0
+        "precision": 0.98051809034468,
+        "recall": 0.9845227858985383,
+        "f1-score": 0.9825163573956881,
+        "support": 4652.0
       },
       "Lexical": {
-        "precision": 0.7958115183246073,
-        "recall": 0.8260869565217391,
-        "f1-score": 0.8106666666666666,
-        "support": 184.0
+        "precision": 0.860655737704918,
+        "recall": 0.9170305676855895,
+        "f1-score": 0.8879492600422833,
+        "support": 229.0
       },
       "Royal Inscriptions": {
-        "precision": 0.9166666666666666,
-        "recall": 0.8461538461538461,
-        "f1-score": 0.88,
-        "support": 260.0
+        "precision": 0.9486404833836858,
+        "recall": 0.8971428571428571,
+        "f1-score": 0.922173274596182,
+        "support": 350.0
       },
       "Literary & Scholarly": {
-        "precision": 0.8951612903225806,
-        "recall": 0.7655172413793103,
-        "f1-score": 0.8252788104089219,
-        "support": 290.0
+        "precision": 0.8662207357859532,
+        "recall": 0.819620253164557,
+        "f1-score": 0.8422764227642277,
+        "support": 316.0
       },
       "Legal": {
-        "precision": 0.8344827586206897,
-        "recall": 0.8066666666666666,
-        "f1-score": 0.8203389830508474,
-        "support": 300.0
+        "precision": 0.9022801302931596,
+        "recall": 0.8765822784810127,
+        "f1-score": 0.8892455858747994,
+        "support": 316.0
       },
       "Letters": {
-        "precision": 0.8198757763975155,
-        "recall": 0.8148148148148148,
-        "f1-score": 0.8173374613003096,
-        "support": 162.0
+        "precision": 0.8711340206185567,
+        "recall": 0.9234972677595629,
+        "f1-score": 0.896551724137931,
+        "support": 183.0
       },
-      "accuracy": 0.937394247038917,
+      "accuracy": 0.960800529275554,
       "macro avg": {
-        "precision": 0.8707925162671276,
-        "recall": 0.8399978295675012,
-        "f1-score": 0.8542151542723865,
-        "support": 4728.0
+        "precision": 0.9049081996884922,
+        "recall": 0.9030660016886863,
+        "f1-score": 0.9034521041351852,
+        "support": 6046.0
       },
       "weighted avg": {
-        "precision": 0.9365444506136521,
-        "recall": 0.937394247038917,
-        "f1-score": 0.9364929797361058,
-        "support": 4728.0
+        "precision": 0.9607588966021111,
+        "recall": 0.960800529275554,
+        "f1-score": 0.96063464133481,
+        "support": 6046.0
       }
     },
     "language": {
       "Akkadian": {
-        "precision": 0.9771547248182763,
-        "recall": 0.9592252803261978,
-        "f1-score": 0.9681069958847737,
-        "support": 981.0
+        "precision": 0.9594339622641509,
+        "recall": 0.9704198473282443,
+        "f1-score": 0.9648956356736242,
+        "support": 1048.0
       },
       "Sumerian": {
-        "precision": 0.9866590973602044,
-        "recall": 0.9945636623748212,
-        "f1-score": 0.9905956112852664,
-        "support": 3495.0
+        "precision": 0.9927782497875955,
+        "recall": 0.9936224489795918,
+        "f1-score": 0.9932001699957501,
+        "support": 4704.0
       },
       "Bilingual": {
-        "precision": 0.6363636363636364,
-        "recall": 0.30434782608695654,
-        "f1-score": 0.4117647058823529,
-        "support": 23.0
+        "precision": 0.75,
+        "recall": 0.4,
+        "f1-score": 0.5217391304347826,
+        "support": 30.0
       },
       "Peripheral/Other": {
-        "precision": 0.9215686274509803,
-        "recall": 0.9591836734693877,
-        "f1-score": 0.94,
-        "support": 49.0
+        "precision": 0.9074074074074074,
+        "recall": 0.875,
+        "f1-score": 0.8909090909090909,
+        "support": 56.0
       },
-      "accuracy": 0.9830694810905892,
+      "accuracy": 0.9852689277149709,
       "macro avg": {
-        "precision": 0.8804365214982743,
-        "recall": 0.8043301105643408,
-        "f1-score": 0.8276168282630982,
-        "support": 4548.0
+        "precision": 0.9024049048647884,
+        "recall": 0.809760574076959,
+        "f1-score": 0.842686006753312,
+        "support": 5838.0
       },
       "weighted avg": {
-        "precision": 0.9821362261877981,
-        "recall": 0.9830694810905892,
-        "f1-score": 0.9822724741953085,
-        "support": 4548.0
+        "precision": 0.9847260182028938,
+        "recall": 0.9852689277149709,
+        "f1-score": 0.9847151950753543,
+        "support": 5838.0
       }
     },
     "provenience": {
       "Nineveh": {
-        "precision": 0.8144796380090498,
-        "recall": 0.8845208845208845,
-        "f1-score": 0.8480565371024735,
-        "support": 407.0
+        "precision": 0.7931034482758621,
+        "recall": 0.8658823529411764,
+        "f1-score": 0.8278965129358831,
+        "support": 425.0
       },
       "Umma": {
-        "precision": 0.7414708112206216,
-        "recall": 0.8351836037574722,
-        "f1-score": 0.7855421686746988,
-        "support": 1171.0
+        "precision": 0.9238218205293738,
+        "recall": 0.9408284023668639,
+        "f1-score": 0.9322475570032573,
+        "support": 1521.0
       },
       "Girsu": {
-        "precision": 0.753114382785957,
-        "recall": 0.7750582750582751,
-        "f1-score": 0.7639287765651924,
-        "support": 858.0
+        "precision": 0.897737556561086,
+        "recall": 0.9168207024029574,
+        "f1-score": 0.9071787837219936,
+        "support": 1082.0
       },
       "Nippur": {
-        "precision": 0.5985663082437276,
-        "recall": 0.5475409836065573,
-        "f1-score": 0.571917808219178,
-        "support": 305.0
+        "precision": 0.7182320441988951,
+        "recall": 0.6632653061224489,
+        "f1-score": 0.6896551724137931,
+        "support": 392.0
       },
       "Puzriš-Dagan": {
-        "precision": 0.800982800982801,
-        "recall": 0.7616822429906542,
-        "f1-score": 0.7808383233532934,
-        "support": 428.0
+        "precision": 0.9334945586457074,
+        "recall": 0.9484029484029484,
+        "f1-score": 0.9408897014015845,
+        "support": 814.0
       },
       "Kanesh": {
-        "precision": 0.9826086956521739,
-        "recall": 0.9826086956521739,
-        "f1-score": 0.9826086956521739,
-        "support": 115.0
+        "precision": 0.9586776859504132,
+        "recall": 1.0,
+        "f1-score": 0.9789029535864979,
+        "support": 116.0
       },
       "Assur": {
-        "precision": 0.8333333333333334,
-        "recall": 0.7352941176470589,
-        "f1-score": 0.78125,
-        "support": 170.0
+        "precision": 0.8162162162162162,
+        "recall": 0.8435754189944135,
+        "f1-score": 0.8296703296703297,
+        "support": 179.0
       },
       "Uruk": {
-        "precision": 0.7446808510638298,
-        "recall": 0.8333333333333334,
-        "f1-score": 0.7865168539325843,
-        "support": 84.0
+        "precision": 0.8333333333333334,
+        "recall": 0.8737864077669902,
+        "f1-score": 0.8530805687203792,
+        "support": 103.0
       },
       "Ur": {
-        "precision": 0.6835443037974683,
-        "recall": 0.46153846153846156,
-        "f1-score": 0.5510204081632653,
-        "support": 234.0
+        "precision": 0.7377622377622378,
+        "recall": 0.6719745222929936,
+        "f1-score": 0.7033333333333334,
+        "support": 314.0
       },
       "Ugarit": {
-        "precision": 0.9074074074074074,
-        "recall": 0.8448275862068966,
-        "f1-score": 0.875,
-        "support": 58.0
+        "precision": 0.9210526315789473,
+        "recall": 0.958904109589041,
+        "f1-score": 0.9395973154362416,
+        "support": 73.0
       },
       "Sippar": {
-        "precision": 0.6090909090909091,
-        "recall": 0.7362637362637363,
-        "f1-score": 0.6666666666666666,
-        "support": 91.0
+        "precision": 0.6746031746031746,
+        "recall": 0.8333333333333334,
+        "f1-score": 0.7456140350877193,
+        "support": 102.0
       },
       "Nimrud": {
-        "precision": 0.6382978723404256,
-        "recall": 0.43478260869565216,
-        "f1-score": 0.5172413793103449,
-        "support": 69.0
+        "precision": 0.803921568627451,
+        "recall": 0.5324675324675324,
+        "f1-score": 0.640625,
+        "support": 77.0
       },
       "Hattusa": {
-        "precision": 0.6666666666666666,
+        "precision": 0.5,
         "recall": 1.0,
-        "f1-score": 0.8,
-        "support": 2.0
+        "f1-score": 0.6666666666666666,
+        "support": 4.0
       },
       "Mari": {
-        "precision": 0.5,
-        "recall": 0.8,
-        "f1-score": 0.6153846153846154,
-        "support": 5.0
+        "precision": 0.75,
+        "recall": 0.2727272727272727,
+        "f1-score": 0.4,
+        "support": 11.0
       },
       "Ebla": {
-        "precision": 0.9333333333333333,
-        "recall": 0.7368421052631579,
-        "f1-score": 0.8235294117647058,
-        "support": 19.0
+        "precision": 0.875,
+        "recall": 0.9333333333333333,
+        "f1-score": 0.9032258064516129,
+        "support": 15.0
       },
       "Susa": {
-        "precision": 0.0,
-        "recall": 0.0,
-        "f1-score": 0.0,
-        "support": 8.0
+        "precision": 0.6666666666666666,
+        "recall": 0.4,
+        "f1-score": 0.5,
+        "support": 10.0
       },
       "Babylon": {
-        "precision": 0.5853658536585366,
-        "recall": 0.6,
-        "f1-score": 0.5925925925925926,
-        "support": 40.0
+        "precision": 0.6545454545454545,
+        "recall": 0.631578947368421,
+        "f1-score": 0.6428571428571429,
+        "support": 57.0
       },
       "Nuzi": {
-        "precision": 1.0,
-        "recall": 0.5384615384615384,
-        "f1-score": 0.7,
-        "support": 13.0
+        "precision": 0.75,
+        "recall": 0.2727272727272727,
+        "f1-score": 0.4,
+        "support": 11.0
       },
       "Irisagrig": {
-        "precision": 0.7545454545454545,
-        "recall": 0.6102941176470589,
-        "f1-score": 0.6747967479674797,
-        "support": 136.0
+        "precision": 0.9147286821705426,
+        "recall": 0.7919463087248322,
+        "f1-score": 0.8489208633093526,
+        "support": 149.0
       },
       "Persepolis": {
         "precision": 1.0,
-        "recall": 0.75,
-        "f1-score": 0.8571428571428571,
-        "support": 8.0
+        "recall": 0.7,
+        "f1-score": 0.8235294117647058,
+        "support": 10.0
       },
       "Kish": {
-        "precision": 0.3333333333333333,
-        "recall": 0.07692307692307693,
-        "f1-score": 0.125,
-        "support": 13.0
+        "precision": 1.0,
+        "recall": 0.0625,
+        "f1-score": 0.11764705882352941,
+        "support": 16.0
       },
       "Larsa": {
-        "precision": 0.46511627906976744,
-        "recall": 0.7142857142857143,
+        "precision": 0.5555555555555556,
+        "recall": 0.5714285714285714,
         "f1-score": 0.5633802816901409,
-        "support": 28.0
+        "support": 35.0
       },
       "Garšana": {
-        "precision": 0.7076923076923077,
-        "recall": 0.6301369863013698,
-        "f1-score": 0.6666666666666666,
-        "support": 73.0
+        "precision": 0.961038961038961,
+        "recall": 0.891566265060241,
+        "f1-score": 0.925,
+        "support": 83.0
       },
       "Emar": {
-        "precision": 0.09090909090909091,
-        "recall": 0.2,
-        "f1-score": 0.125,
-        "support": 5.0
+        "precision": 0.375,
+        "recall": 0.3,
+        "f1-score": 0.3333333333333333,
+        "support": 10.0
       },
       "Isin": {
-        "precision": 0.8095238095238095,
-        "recall": 0.6938775510204082,
-        "f1-score": 0.7472527472527473,
-        "support": 49.0
+        "precision": 0.8666666666666667,
+        "recall": 0.8297872340425532,
+        "f1-score": 0.8478260869565217,
+        "support": 47.0
       },
       "Ešnunna": {
-        "precision": 0.25,
-        "recall": 0.2222222222222222,
-        "f1-score": 0.23529411764705882,
-        "support": 9.0
+        "precision": 0.7,
+        "recall": 0.6363636363636364,
+        "f1-score": 0.6666666666666666,
+        "support": 22.0
       },
       "Šaduppum": {
-        "precision": 0.0,
-        "recall": 0.0,
-        "f1-score": 0.0,
-        "support": 5.0
+        "precision": 0.2,
+        "recall": 0.1111111111111111,
+        "f1-score": 0.14285714285714285,
+        "support": 9.0
       },
       "Nerebtum": {
-        "precision": 0.5,
-        "recall": 0.36363636363636365,
-        "f1-score": 0.42105263157894735,
-        "support": 11.0
-      },
-      "Šuruppak": {
-        "precision": 0.0,
-        "recall": 0.0,
-        "f1-score": 0.0,
+        "precision": 0.6666666666666666,
+        "recall": 0.5714285714285714,
+        "f1-score": 0.6153846153846154,
         "support": 7.0
       },
+      "Šuruppak": {
+        "precision": 0.6,
+        "recall": 0.6,
+        "f1-score": 0.6,
+        "support": 10.0
+      },
       "Kisurra": {
-        "precision": 0.7647058823529411,
-        "recall": 0.8666666666666667,
-        "f1-score": 0.8125,
-        "support": 15.0
+        "precision": 0.8421052631578947,
+        "recall": 0.8888888888888888,
+        "f1-score": 0.8648648648648649,
+        "support": 18.0
       },
       "Adab": {
-        "precision": 0.6213592233009708,
-        "recall": 0.6881720430107527,
-        "f1-score": 0.6530612244897959,
-        "support": 93.0
+        "precision": 0.6737588652482269,
+        "recall": 0.8189655172413793,
+        "f1-score": 0.7392996108949417,
+        "support": 116.0
       },
       "Huzirina": {
         "precision": 0.0,
         "recall": 0.0,
         "f1-score": 0.0,
-        "support": 8.0
-      },
-      "Pī-Kasî": {
-        "precision": 0.0,
-        "recall": 0.0,
-        "f1-score": 0.0,
         "support": 9.0
       },
+      "Pī-Kasî": {
+        "precision": 0.3333333333333333,
+        "recall": 0.16666666666666666,
+        "f1-score": 0.2222222222222222,
+        "support": 6.0
+      },
       "Tuttul": {
-        "precision": 0.75,
-        "recall": 0.7058823529411765,
-        "f1-score": 0.7272727272727273,
+        "precision": 0.7142857142857143,
+        "recall": 0.5882352941176471,
+        "f1-score": 0.6451612903225806,
         "support": 17.0
       },
       "Amarna": {
         "precision": 1.0,
-        "recall": 0.7857142857142857,
-        "f1-score": 0.88,
-        "support": 14.0
+        "recall": 0.9166666666666666,
+        "f1-score": 0.9565217391304348,
+        "support": 12.0
       },
       "Zabalam": {
-        "precision": 0.75,
-        "recall": 0.42857142857142855,
-        "f1-score": 0.5454545454545454,
-        "support": 14.0
+        "precision": 0.9047619047619048,
+        "recall": 0.7916666666666666,
+        "f1-score": 0.8444444444444444,
+        "support": 24.0
       },
-      "accuracy": 0.7431932040949684,
+      "accuracy": 0.8618354216051473,
       "macro avg": {
-        "precision": 0.5997257930087199,
-        "recall": 0.5623422494982326,
-        "f1-score": 0.5687769106817986,
-        "support": 4591.0
+        "precision": 0.7365575002883413,
+        "recall": 0.6610230350345677,
+        "f1-score": 0.6738472364431093,
+        "support": 5906.0
       },
       "weighted avg": {
-        "precision": 0.7389622162994767,
-        "recall": 0.7431932040949684,
-        "f1-score": 0.7371147533503353,
-        "support": 4591.0
+        "precision": 0.8598613130986182,
+        "recall": 0.8618354216051473,
+        "f1-score": 0.8579278246809756,
+        "support": 5906.0
       }
     }
   }
