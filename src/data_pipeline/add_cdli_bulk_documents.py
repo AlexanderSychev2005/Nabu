@@ -40,6 +40,18 @@ IN_PATHS = [
 DOCS_DIR = os.path.join(BASE_DIR, "data", "processed", "hf_dataset_documents")
 
 
+def split_ids(tablet_id: str) -> list[str]:
+    """ORACC's own catalogue occasionally joins several physical P-numbers
+    into one tablet_id ("P1; P2; P3", curator-noted joins/exemplar groups)
+    -- every exact-string membership check below must compare atomic
+    P-numbers, not the joined string, or a backfill source that (correctly)
+    treats each P-number as its own document silently duplicates -- and can
+    split-leak -- content already covered by the joined base row. Confirmed
+    on the rebuilt corpus: 21 cross-split (train/test, train/validation)
+    collisions and 78 same-split duplicate rows before this fix."""
+    return [p.strip() for p in tablet_id.split(";")] if ";" in tablet_id else [tablet_id]
+
+
 def main() -> None:
     rows = {"train": [], "validation": [], "test": []}
     seen_tablet_ids = set()
@@ -49,9 +61,10 @@ def main() -> None:
         with open(in_path, encoding="utf-8") as f:
             for line in f:
                 r = json.loads(line)
-                if r["tablet_id"] in seen_tablet_ids:
+                atoms = split_ids(r["tablet_id"])
+                if seen_tablet_ids.intersection(atoms):
                     continue
-                seen_tablet_ids.add(r["tablet_id"])
+                seen_tablet_ids.update(atoms)
                 rows[r["split"]].append({
                 "signs": r.get("signs", []),
                 "text": r["text"],
@@ -70,7 +83,7 @@ def main() -> None:
     n_dropped = 0
     for split in ("train", "validation", "test"):
         before = len(ds[split])
-        ds[split] = ds[split].filter(lambda ex: ex["tablet_id"] not in seen_tablet_ids)
+        ds[split] = ds[split].filter(lambda ex: not seen_tablet_ids.intersection(split_ids(ex["tablet_id"])))
         n_dropped += before - len(ds[split])
     if n_dropped:
         print(f"Dropped {n_dropped} base-corpus rows whose tablet_id is also in a backfill source "

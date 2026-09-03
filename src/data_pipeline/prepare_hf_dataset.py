@@ -227,8 +227,116 @@ def label_to_idx(label_str: Optional[str], label_list: list[str]) -> int:
     except ValueError:
         return -100
 
+def _split_ids(tablet_id: str) -> list[str]:
+    """ORACC's own catalogue occasionally joins several physical P-numbers
+    into one tablet_id ("P1; P2; P3", curator-noted joins/exemplar groups).
+    Every identity check below (cross-source dedup, split grouping) must
+    compare atomic P-numbers, not the joined string, or a source that
+    (correctly) treats each P-number as its own document silently
+    duplicates -- and can leak across train/val/test -- content already
+    covered by the joined row."""
+    return [p.strip() for p in tablet_id.split(";")] if ";" in tablet_id else [tablet_id]
+
+
+def _load_photo_atoms() -> set[str]:
+    """P-numbers (no leading zeros) that have a real photo in the vision
+    manifest -- used to steer _canonical_group_keys's representative choice
+    away from orphaning a photo (see its own docstring)."""
+    manifest = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "data", "vision_dataset", "manifest.jsonl",
+    )
+    if not os.path.exists(manifest):
+        return set()
+    atoms = set()
+    with open(manifest, encoding="utf-8") as f:
+        for line in f:
+            try:
+                atoms.add("P" + json.loads(line)["id"].lstrip("0"))
+            except Exception:
+                pass
+    return atoms
+
+
+def _canonical_group_keys(tablet_ids: list, prefer: Optional[set] = None) -> dict:
+    """Union-Find over atomic P-numbers: two tablet_id strings sharing any
+    atom must resolve to the same canonical key, so grouping/splitting by
+    tablet identity treats them as one physical document. {tablet_id ->
+    canonical_key}, tablet_ids repeated verbatim resolve identically.
+
+    The representative picked for each merged group is NOT arbitrary: when
+    several physical fragments join into one text, each fragment can carry
+    its own separate photo, and the vision pipeline looks up a document's
+    photo by its own tablet_id -- picking a photo-less atom as the
+    representative would silently orphan a real photo the merge otherwise
+    has no way to know it lost (confirmed: 8 of 9 photographed join-groups
+    in this corpus would lose their photo without this). `prefer` (atoms
+    known to have a photo) is preferred as the representative when present
+    in a group; the lexicographically smallest atom breaks every tie, so
+    the choice is reproducible run to run."""
+    prefer = prefer or set()
+    parent: dict[str, str] = {}
+
+    def find(x: str) -> str:
+        root = x
+        while parent.get(root, root) != root:
+            root = parent[root]
+        while parent.get(x, x) != root:
+            parent[x], x = root, parent.get(x, x)
+        return root
+
+    def union(a: str, b: str) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for tid in tablet_ids:
+        atoms = _split_ids(tid)
+        for a in atoms:
+            parent.setdefault(a, a)
+        for a in atoms[1:]:
+            union(atoms[0], a)
+
+    members: dict[str, list[str]] = {}
+    for tid in tablet_ids:
+        for a in _split_ids(tid):
+            members.setdefault(find(a), []).append(a)
+
+    representative = {}
+    for root, atoms in members.items():
+        photographed = sorted(a for a in set(atoms) if a in prefer)
+        representative[root] = photographed[0] if photographed else min(atoms)
+
+    return {tid: representative[find(_split_ids(tid)[0])] for tid in tablet_ids}
+
+
 def load_and_deduplicate_v2(files: list) -> list[dict]:
     print("Loading and deduplicating datasets (v2)...")
+
+    # Canonicalize tablet_id up front, across every input file, before any
+    # dedup/grouping below runs: ORACC's own catalogue occasionally joins
+    # several physical P-numbers into one tablet_id ("P1; P2; P3"), while
+    # another source (CuneiML, or a later backfill stage) may carry one of
+    # those same P-numbers as its own standalone tablet_id. Without this,
+    # such rows dedup and group independently -- confirmed causing both
+    # cross-split leakage and same-split duplicate documents on the
+    # rebuilt corpus. Rewriting every row's tablet_id to one shared
+    # canonical form here means every dedup/grouping step downstream (in
+    # this function and every later pipeline stage that reads its output)
+    # just sees one identity, with no separate atom-aware logic needed.
+    all_tids = []
+    for file_path in files:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    tid = json.loads(line).get('tablet_id')
+                except Exception:
+                    continue
+                if tid:
+                    all_tids.append(tid)
+    canonical_tid = _canonical_group_keys(all_tids, prefer=_load_photo_atoms())
+    print(f"Canonicalized {len(canonical_tid)} tablet_id strings "
+          f"({sum(1 for t, k in canonical_tid.items() if t != k)} rewritten to a shared id)")
 
     # Cross-source dedup: a small number of CuneiML tablets (~1.5% of them)
     # are the same physical tablet as an ORACC edition (same CDLI P-number).
@@ -245,7 +353,7 @@ def load_and_deduplicate_v2(files: list) -> list[dict]:
                     try:
                         tid = json.loads(line).get('tablet_id')
                         if tid:
-                            cuneiml_tablet_ids.add(tid)
+                            cuneiml_tablet_ids.add(canonical_tid.get(tid, tid))
                     except Exception:
                         pass
     print(f"CuneiML tablet count (preferred on overlap): {len(cuneiml_tablet_ids)}")
@@ -260,6 +368,8 @@ def load_and_deduplicate_v2(files: list) -> list[dict]:
             for line in tqdm(f):
                 try:
                     data = json.loads(line)
+                    if data.get('tablet_id'):
+                        data['tablet_id'] = canonical_tid.get(data['tablet_id'], data['tablet_id'])
                     if is_oracc and data.get('tablet_id') in cuneiml_tablet_ids:
                         skipped_cross_source += 1
                         continue
@@ -274,10 +384,24 @@ def load_and_deduplicate_v2(files: list) -> list[dict]:
                     raw_text = (data.get('raw') or '').strip()
                     dedup_key = sign_str or raw_text
                     if not dedup_key: continue
+                    # Scoped to (tablet_id, dedup_key), not dedup_key alone:
+                    # a bare content key collides constantly across
+                    # unrelated tablets (e.g. a single-word line like "dumu"
+                    # or a common royal name repeats verbatim throughout the
+                    # corpus by design -- formulaic phrases, not duplicate
+                    # documents), which used to silently drop that line from
+                    # every tablet except whichever one got processed first,
+                    # even when the missing line was the tablet's own most
+                    # important content (caught via the Enheduanna disc,
+                    # P217330, which was losing its own name-line this way).
+                    # This key still catches its original purpose: the same
+                    # line appearing twice for the *same* document because
+                    # of overlapping source files.
+                    key = (data.get('tablet_id') or '', dedup_key)
 
                     # Merge metadata
-                    if dedup_key in unique_lines:
-                        existing = unique_lines[dedup_key]
+                    if key in unique_lines:
+                        existing = unique_lines[key]
                         existing['provenience'] = data.get('provenience', existing.get('provenience', 'unknown'))
                         existing['language'] = data.get('language', existing.get('language', 'unknown'))
                         if existing.get('period', 'unknown').lower() == 'unknown':
@@ -285,7 +409,7 @@ def load_and_deduplicate_v2(files: list) -> list[dict]:
                         if existing.get('genre', 'unknown').lower() == 'unknown':
                             existing['genre'] = data.get('genre', 'unknown')
                     else:
-                        unique_lines[dedup_key] = data
+                        unique_lines[key] = data
                 except Exception:
                     pass
 
@@ -345,7 +469,9 @@ def main() -> None:
     # Lines from the same physical tablet are highly correlated (same
     # formulae, obviously the same period/genre/provenience), so a per-line
     # random split leaks tablet identity across train/val/test and inflates
-    # both MLM and classification metrics.
+    # both MLM and classification metrics. tablet_id is already canonical
+    # (rewritten above, before dedup) so no separate grouping pass is needed
+    # here to unify joined/atom siblings.
     groups = {}
     for r in all_unique_records:
         groups.setdefault(r.get('tablet_id') or r.get('signs', [None])[0], []).append(r)

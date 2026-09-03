@@ -36,7 +36,14 @@ COMBINED_PATH = os.path.join(BASE_DIR, "data", "processed", "combined_unique.jso
 SOURCES = ["cdli_bulk_documents.jsonl", "ebl_bulk_documents.jsonl", "balance_documents.jsonl"]
 
 
-def load_existing_sign_keys() -> set[str]:
+def load_existing_sign_keys() -> set[tuple[str, str]]:
+    """(tablet_id, line-sign-key) pairs, not bare sign-keys -- a bare key
+    collides constantly across unrelated tablets (a single common word or
+    formulaic name recurs verbatim throughout the corpus by design), which
+    used to silently drop that line from whichever tablet processed it
+    later, even when it was that tablet's own distinctive content. See
+    add_showcase_texts.py's load_existing_sign_keys for the confirmed case
+    (the Enheduanna disc, P217330, losing its own name-line this way)."""
     keys = set()
     with open(COMBINED_PATH, encoding="utf-8") as f:
         for line in f:
@@ -47,7 +54,7 @@ def load_existing_sign_keys() -> set[str]:
             signs = r.get("signs") or []
             k = "".join(signs).strip()
             if k:
-                keys.add(k)
+                keys.add((r.get("tablet_id") or "", k))
     return keys
 
 
@@ -116,10 +123,11 @@ def main() -> None:
                 if len(signs) < 2 and not raw_text:
                     continue
                 sign_key = "".join(signs) or raw_text
-                if sign_key in existing_keys:
+                key = (tid, sign_key)
+                if key in existing_keys:
                     n_dupe += 1
                     continue
-                existing_keys.add(sign_key)  # dedup within this run too
+                existing_keys.add(key)  # dedup within this run too
                 tablet_signs.extend(signs)
                 text = clean_transliteration(ln["raw"])
                 if text:

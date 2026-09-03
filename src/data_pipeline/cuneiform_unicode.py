@@ -21,6 +21,15 @@ VOCAB_DIR = os.path.join(
 
 _FACE_KEYS = ("obverse", "reverse", "left", "right", "top", "down", "surface a")
 
+# A genuine ATF line number: digits (optionally zero-padded) or the "unclear
+# line number" marker x/X, optionally followed by one or more primes for
+# broken/reverse numbering (e.g. "01", "12'", "x."). Guards the "N. body"
+# split below against non-line content that happens to contain ". " --
+# e.g. a CDLI composite header comment ("= RIME 2.01.01.16, ex. 01") left
+# attached to the first line of a &P###### chunk by index_cdli_bodies's
+# regex split, which used to get misparsed as a bogus line "ex" -> "01".
+_LINE_NUM_RE = re.compile(r"^(?:\d+|[xX])'*$")
+
 
 def _load_vocab() -> dict[str, str]:
     text2sign = {}
@@ -114,6 +123,8 @@ def atf_to_lines(raw_text: str) -> tuple[list[dict], Counter, int]:
         if len(parts) > 2:
             parts = parts[0], ". ".join(parts[1:])
         line_num, body = parts
+        if not _LINE_NUM_RE.match(line_num.strip()):
+            continue
 
         # Two derived strings from here, both starting from the same
         # unmutated `body` so they stay aligned:

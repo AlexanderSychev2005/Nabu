@@ -156,11 +156,24 @@ def process_zip(zip_path: str, out_f, seen_signs: set[str]) -> dict:
             # every other one, keeping only the first -- fall back to the
             # cleaned text instead so genuinely different signless lines
             # don't wrongly shadow each other.
+            #
+            # Scoped to (tablet_id, sign_key), not sign_key alone: a bare
+            # key collides constantly across unrelated tablets (a single
+            # common word or formulaic name recurs verbatim throughout the
+            # corpus by design), which used to silently drop that line from
+            # every tablet except whichever one this global `seen_signs`
+            # set (shared across every ORACC project processed) saw first
+            # -- confirmed losing tablet-specific content this way,
+            # including the Enheduanna disc's own name-line (P217330,
+            # reached via a different pipeline stage but the identical
+            # bug). This project is ORACC's largest single source (~97% of
+            # the corpus), so this was the dominant instance of the bug.
             sign_key = "".join(signs) or raw_text
-            if sign_key in seen_signs:
+            key = (tablet_id, sign_key)
+            if key in seen_signs:
                 stats["skipped_dupe"] += 1
                 continue
-            seen_signs.add(sign_key)
+            seen_signs.add(key)
             line["signs"] = signs
             line["textid"] = textid
             line["cdli_id"] = cdli_id

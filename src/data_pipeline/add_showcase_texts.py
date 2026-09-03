@@ -108,7 +108,17 @@ def find_cdli_composite_bodies(atf_path: str, works: dict[str, str]) -> dict[str
     return found
 
 
-def load_existing_sign_keys() -> set[str]:
+def load_existing_sign_keys() -> set[tuple[str, str]]:
+    """(tablet_id, line-sign-key) pairs, not bare sign-keys: a bare key
+    collides constantly across unrelated tablets (a single common word like
+    "dumu", or a formulaic royal name, recurs verbatim throughout the
+    corpus by design), which used to silently drop that line from every
+    showcase tablet except whichever document registered it first -- lost
+    a genuine, tablet-specific line this way, once even the Enheduanna
+    disc's own name-line (P217330). Scoping to (tablet_id, key) still lets
+    this set do its real job -- skip a line this exact showcase run has
+    already written for this exact tablet -- without the false cross-tablet
+    collision."""
     keys = set()
     with open(COMBINED_PATH, encoding="utf-8") as f:
         for line in f:
@@ -118,7 +128,7 @@ def load_existing_sign_keys() -> set[str]:
                 continue
             k = "".join(r.get("signs") or []).strip()
             if k:
-                keys.add(k)
+                keys.add((r.get("tablet_id") or "", k))
     return keys
 
 
@@ -155,9 +165,10 @@ def main() -> None:
                     if len(signs) < 2 and not raw_text:
                         continue
                     sign_key = "".join(signs) or raw_text
-                    if sign_key in existing_keys:
+                    key = (tid, sign_key)
+                    if key in existing_keys:
                         continue
-                    existing_keys.add(sign_key)
+                    existing_keys.add(key)
                     tablet_signs.extend(signs)
                     text = clean_transliteration(ln["raw"])
                     if text:
@@ -199,9 +210,10 @@ def main() -> None:
                 if len(signs) < 2 and not raw_text:
                     continue
                 sign_key = "".join(signs) or raw_text
-                if sign_key in existing_keys:
+                key = (tid, sign_key)
+                if key in existing_keys:
                     continue
-                existing_keys.add(sign_key)
+                existing_keys.add(key)
                 tablet_signs.extend(signs)
                 text = clean_transliteration(ln["raw"])
                 if text:
