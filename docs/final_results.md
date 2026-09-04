@@ -88,3 +88,30 @@ this project's original 4-way ablation (before this session's pipeline
 fixes) and Aeneas's own architecture (Assael et al. 2025 restrict vision to
 the geography head). `checkpoints_final_vision` is the final vision model
 for the thesis.
+
+## Provenience gain across every corpus state (archive, 2026-09-04)
+
+The full trajectory, across every corpus rebuild this project has gone
+through, of text-only vs. vision-conditioned provenience macro-F1. Kept
+here purely as a record -- `docs/paper_draft.md` and `results_final/README.md`
+cite only the current (last row) numbers.
+
+| Corpus state | Documents | Split | text-only F1 | vision F1 | Gain |
+|---|---|---|---|---|---|
+| 12-class provenience (2026-08-13) | — | validation | 0.725 | 0.766 / 0.764 (two runs) | +0.040 |
+| 36-class, pre len(signs)<2 fix (2026-08-24) | 56,934 | test | 0.449 | 0.541 | +0.092 |
+| Post len(signs)<2 fix (2026-09-03 AM) | 126,023 | test | 0.569 | 0.633 | +0.064 |
+| Post dedup/leakage/bracket fixes (2026-09-03 PM) | 150,804 | test | 0.674 | **0.685** | +0.011 |
+
+**Reading it:** text-only's own provenience macro-F1 rose from 0.449 to
+0.674 (+0.225) purely from corpus fixes -- more documents, no lost lines,
+no train/test leakage -- while vision's *added* gain over text-only shrank
+monotonically across the three 36-class states (+0.092 -> +0.064 -> +0.011).
+The likely reading: the cleaner and larger the text corpus gets, the less
+headroom is left for a second modality to close, and part of the earlier,
+larger gains may specifically have reflected the leaked train/test overlap
+disproportionately inflating scores on photographed (and therefore
+duplicate-content-prone) tablets rather than a genuine image signal --
+plausible, not confirmed. The 12-class point doesn't fit the same monotonic
+story, but it's a different label-space scale and a validation- rather than
+test-split number, so it isn't directly comparable to the other three.
